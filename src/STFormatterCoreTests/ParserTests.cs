@@ -475,6 +475,20 @@ END_FUNCTION_BLOCK";
         }
 
         [Fact]
+        public void BareVarInput_Block_TopLevel()
+        {
+            // A TwinCAT editor hands the formatter a bare VAR_INPUT block without a
+            // PROGRAM/METHOD head. It must still parse as a single VarBlock, not be
+            // split into broken pieces (the "type on its own line" bug).
+            var source = "VAR_INPUT\n    execute : BOOL;\n    entry : InsertEntry;\nEND_VAR";
+            var unit = Parse(source);
+            var varBlock = unit.Children.OfType<VarBlock>().FirstOrDefault();
+            Assert.NotNull(varBlock);
+            Assert.Equal(VarKind.VarInput, varBlock.VarKind);
+            Assert.Equal(2, varBlock.Children.OfType<VarDeclaration>().Count());
+        }
+
+        [Fact]
         public void VarPersistent_Block()
         {
             var source = "VAR_PERSISTENT\n    pCounter : INT;\nEND_VAR";

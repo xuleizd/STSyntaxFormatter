@@ -201,6 +201,11 @@ namespace STFormatterVSIX
                 if (string.IsNullOrWhiteSpace(source))
                     return source;
 
+                // TwinCAT hands us fragments in several shapes: a full POU header,
+                // a method/property header with VAR blocks, or a bare
+                // "VAR_INPUT ... END_VAR" variable block. The parser handles all of
+                // these at the top level (IsVarKeyword routes every VAR variant to
+                // ParseVarBlock), so no wrapper is needed.
                 var lexer = new STFormatterCore.Lexer.STLexer(source);
                 var tokens = lexer.Tokenize();
                 var parser = new STFormatterCore.Parser.STParser(tokens);

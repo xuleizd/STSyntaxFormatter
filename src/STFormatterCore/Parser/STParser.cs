@@ -89,6 +89,14 @@ namespace STFormatterCore.Parser
 
         private SyntaxNode ParseDeclaration()
         {
+            // Every VAR block variant can appear at the top level of a declaration
+            // section (a TwinCAT editor passes the bare "VAR_INPUT ... END_VAR" text
+            // when formatting a POU's variable block). Route all of them to
+            // ParseVarBlock so a bare VAR block is never misparsed as unknown and
+            // split into broken pieces.
+            if (IsVarKeyword(Current.Kind))
+                return ParseVarBlock();
+
             switch (Current.Kind)
             {
                 case TokenKind.Keyword_Program:
@@ -107,10 +115,6 @@ namespace STFormatterCore.Parser
                     return ParseUsing();
                 case TokenKind.Pragma:
                     return ParseAttributeDirective();
-                case TokenKind.Keyword_VarGlobal:
-                case TokenKind.Keyword_VarRetain:
-                case TokenKind.Keyword_VarPersistent:
-                    return ParseVarBlock();
                 case TokenKind.EndOfFile:
                     return null;
                 default:
