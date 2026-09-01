@@ -2309,6 +2309,12 @@ namespace STFormatterCore.Formatter
             if (current.Kind == TokenKind.Dot || previous.Kind == TokenKind.Dot)
                 return false;
 
+            // No space around '#' (enum value access E_Mode#Running, typed
+            // literals on user-defined types). Standard-type typed literals
+            // (INT#5) are already scanned as single TypedLiteral tokens.
+            if (current.Kind == TokenKind.Hash || previous.Kind == TokenKind.Hash)
+                return false;
+
             // No space around caret (dereference)
             if (current.Kind == TokenKind.Caret || previous.Kind == TokenKind.Caret)
                 return false;

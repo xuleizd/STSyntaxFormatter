@@ -138,6 +138,12 @@ namespace STFormatterCore.Lexer
                 "T", "TIME", "D", "DATE", "DT", "DATE_AND_TIME",
                 "TOD", "TIME_OF_DAY",
                 "LT", "LTIME", "LD", "LDATE", "LDT", "LTOD",
+                // Typed literals on elementary types (IEC 61131-3 / TwinCAT):
+                // INT#5, WORD#16#FF, BOOL#TRUE, REAL#3.14 ...
+                "BOOL", "BYTE", "WORD", "DWORD", "LWORD",
+                "SINT", "INT", "DINT", "LINT",
+                "USINT", "UINT", "UDINT", "ULINT",
+                "REAL", "LREAL",
             };
 
         public STLexer(string source)
@@ -670,6 +676,13 @@ namespace STFormatterCore.Lexer
                 }
                 if (c == '\'')
                 {
+                    // Doubled quote '' is an embedded literal quote (IEC 61131-3),
+                    // not the end of the string.
+                    if (Peek(1) == '\'')
+                    {
+                        _pos += 2;
+                        continue;
+                    }
                     _pos++; // skip closing '
                     return TokenKind.StringLiteral;
                 }
@@ -694,6 +707,12 @@ namespace STFormatterCore.Lexer
                 }
                 if (c == '"')
                 {
+                    // Doubled quote "" is an embedded literal quote, not the end.
+                    if (Peek(1) == '"')
+                    {
+                        _pos += 2;
+                        continue;
+                    }
                     _pos++; // skip closing "
                     return TokenKind.WStringLiteral;
                 }
