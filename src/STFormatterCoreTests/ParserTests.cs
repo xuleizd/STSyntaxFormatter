@@ -464,6 +464,26 @@ END_FUNCTION_BLOCK";
             Assert.Equal(VarKind.VarGlobal, varBlock.VarKind);
         }
 
+        [Fact]
+        public void VarRetain_Block()
+        {
+            var source = "VAR_RETAIN\n    rCounter : INT;\nEND_VAR";
+            var unit = Parse(source);
+            var varBlock = unit.Children.OfType<VarBlock>().FirstOrDefault();
+            Assert.NotNull(varBlock);
+            Assert.Equal(VarKind.VarRetain, varBlock.VarKind);
+        }
+
+        [Fact]
+        public void VarPersistent_Block()
+        {
+            var source = "VAR_PERSISTENT\n    pCounter : INT;\nEND_VAR";
+            var unit = Parse(source);
+            var varBlock = unit.Children.OfType<VarBlock>().FirstOrDefault();
+            Assert.NotNull(varBlock);
+            Assert.Equal(VarKind.VarPersistent, varBlock.VarKind);
+        }
+
         #endregion
 
         #region 28. ARRAY type

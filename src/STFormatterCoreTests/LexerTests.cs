@@ -42,6 +42,10 @@ namespace STFormatterCoreTests
         [InlineData("END_FUNCTION_BLOCK", TokenKind.Keyword_EndFunctionBlock)]
         [InlineData("VAR", TokenKind.Keyword_Var)]
         [InlineData("END_VAR", TokenKind.Keyword_EndVar)]
+        [InlineData("VAR_RETAIN", TokenKind.Keyword_VarRetain)]
+        [InlineData("var_retain", TokenKind.Keyword_VarRetain)]
+        [InlineData("VAR_PERSISTENT", TokenKind.Keyword_VarPersistent)]
+        [InlineData("var_persistent", TokenKind.Keyword_VarPersistent)]
         [InlineData("RETURN", TokenKind.Keyword_Return)]
         public void SimpleKeywords_CaseInsensitive(string text, TokenKind expectedKind)
         {

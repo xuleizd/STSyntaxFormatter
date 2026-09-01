@@ -108,6 +108,8 @@ namespace STFormatterCore.Parser
                 case TokenKind.Pragma:
                     return ParseAttributeDirective();
                 case TokenKind.Keyword_VarGlobal:
+                case TokenKind.Keyword_VarRetain:
+                case TokenKind.Keyword_VarPersistent:
                     return ParseVarBlock();
                 case TokenKind.EndOfFile:
                     return null;
@@ -533,6 +535,8 @@ namespace STFormatterCore.Parser
                    kind == TokenKind.Keyword_VarInst ||
                    kind == TokenKind.Keyword_VarConstant ||
                    kind == TokenKind.Keyword_VarGlobal ||
+                   kind == TokenKind.Keyword_VarRetain ||
+                   kind == TokenKind.Keyword_VarPersistent ||
                    kind == TokenKind.Keyword_VarExternal ||
                    kind == TokenKind.Keyword_VarAccess ||
                    kind == TokenKind.Keyword_VarConfig;
@@ -551,6 +555,8 @@ namespace STFormatterCore.Parser
                 case TokenKind.Keyword_VarInst: return VarKind.VarInst;
                 case TokenKind.Keyword_VarConstant: return VarKind.VarConstant;
                 case TokenKind.Keyword_VarGlobal: return VarKind.VarGlobal;
+                case TokenKind.Keyword_VarRetain: return VarKind.VarRetain;
+                case TokenKind.Keyword_VarPersistent: return VarKind.VarPersistent;
                 case TokenKind.Keyword_VarExternal: return VarKind.VarExternal;
                 case TokenKind.Keyword_VarAccess: return VarKind.VarAccess;
                 case TokenKind.Keyword_VarConfig: return VarKind.VarConfig;

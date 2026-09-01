@@ -26,8 +26,9 @@ namespace STFormatterCore.Lexer
         Keyword_Var, Keyword_EndVar,
         Keyword_VarInput, Keyword_VarOutput, Keyword_VarInOut,
         Keyword_VarTemp, Keyword_VarStat, Keyword_VarInst,
-        Keyword_VarConstant, Keyword_VarGlobal,
+        Keyword_VarConstant, Keyword_VarGlobal, Keyword_VarRetain,
         Keyword_VarExternal, Keyword_VarAccess, Keyword_VarConfig,
+        Keyword_VarPersistent,
 
         // Keywords - VAR modifiers
         Keyword_Constant, Keyword_Retain, Keyword_Persistent,

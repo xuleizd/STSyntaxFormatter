@@ -19,6 +19,8 @@ namespace STFormatterCore.Parser.Nodes
         VarInst,
         VarConstant,
         VarGlobal,
+        VarRetain,
+        VarPersistent,
         VarExternal,
         VarAccess,
         VarConfig

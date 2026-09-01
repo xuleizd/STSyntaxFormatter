@@ -31,6 +31,8 @@ namespace STFormatterCore.Lexer
                 { "VAR_INST", TokenKind.Keyword_VarInst },
                 { "VAR_CONSTANT", TokenKind.Keyword_VarConstant },
                 { "VAR_GLOBAL", TokenKind.Keyword_VarGlobal },
+                { "VAR_RETAIN", TokenKind.Keyword_VarRetain },
+                { "VAR_PERSISTENT", TokenKind.Keyword_VarPersistent },
                 { "VAR_EXTERNAL", TokenKind.Keyword_VarExternal },
                 { "VAR_ACCESS", TokenKind.Keyword_VarAccess },
                 { "VAR_CONFIG", TokenKind.Keyword_VarConfig },
