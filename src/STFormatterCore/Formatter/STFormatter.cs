@@ -703,7 +703,10 @@ namespace STFormatterCore.Formatter
             for (int i = 0; i < _options.BlankLinesBeforeEnd; i++)
                 _output.WriteLine();
 
-            // Write END_METHOD
+            // Write END_METHOD. TwinCAT TcPOU files store the METHOD header + VAR
+            // blocks in the Declaration node and the statements in the Implementation
+            // node, so the Declaration text frequently has NO END_METHOD. Only write
+            // END_METHOD when the source actually contained it — never synthesize one.
             var endTok = node.Tokens.LastOrDefault(t => t.Kind == TokenKind.Keyword_EndMethod);
             if (endTok != null)
             {
@@ -711,11 +714,6 @@ namespace STFormatterCore.Formatter
                 _output.WriteIndent(_indent.CurrentIndent);
                 _output.WriteKeyword("END_METHOD");
                 WriteTrailingTrivia(endTok);
-            }
-            else
-            {
-                _output.WriteIndent(_indent.CurrentIndent);
-                _output.WriteKeyword("END_METHOD");
             }
             _output.WriteLine();
         }
@@ -763,7 +761,10 @@ namespace STFormatterCore.Formatter
             for (int i = 0; i < _options.BlankLinesBeforeEnd; i++)
                 _output.WriteLine();
 
-            // Write END_PROPERTY
+            // Write END_PROPERTY. TwinCAT stores the PROPERTY header + VAR blocks in
+            // the Declaration node and the accessors in the Implementation node, so the
+            // Declaration text frequently has NO END_PROPERTY. Only write it when the
+            // source actually contained it — never synthesize one.
             var endTok = node.Tokens.LastOrDefault(t => t.Kind == TokenKind.Keyword_EndProperty);
             if (endTok != null)
             {
@@ -771,11 +772,6 @@ namespace STFormatterCore.Formatter
                 _output.WriteIndent(_indent.CurrentIndent);
                 _output.WriteKeyword("END_PROPERTY");
                 WriteTrailingTrivia(endTok);
-            }
-            else
-            {
-                _output.WriteIndent(_indent.CurrentIndent);
-                _output.WriteKeyword("END_PROPERTY");
             }
             _output.WriteLine();
         }
@@ -810,11 +806,6 @@ namespace STFormatterCore.Formatter
                 _output.WriteKeyword("END_GET");
                 WriteTrailingTrivia(endTok);
             }
-            else
-            {
-                _output.WriteIndent(_indent.CurrentIndent);
-                _output.WriteKeyword("END_GET");
-            }
             _output.WriteLine();
         }
 
@@ -847,11 +838,6 @@ namespace STFormatterCore.Formatter
                 _output.WriteIndent(_indent.CurrentIndent);
                 _output.WriteKeyword("END_SET");
                 WriteTrailingTrivia(endTok);
-            }
-            else
-            {
-                _output.WriteIndent(_indent.CurrentIndent);
-                _output.WriteKeyword("END_SET");
             }
             _output.WriteLine();
         }
@@ -1664,11 +1650,6 @@ namespace STFormatterCore.Formatter
                 _output.WriteIndent(_indent.CurrentIndent);
                 _output.WriteKeyword("END_TYPE");
                 WriteTrailingTrivia(endTypeToken);
-            }
-            else
-            {
-                _output.WriteIndent(_indent.CurrentIndent);
-                _output.WriteKeyword("END_TYPE");
             }
             _output.WriteLine();
         }

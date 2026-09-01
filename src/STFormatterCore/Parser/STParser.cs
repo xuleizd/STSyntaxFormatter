@@ -97,6 +97,19 @@ namespace STFormatterCore.Parser
             if (IsVarKeyword(Current.Kind))
                 return ParseVarBlock();
 
+            // POU sub-objects (Method / Property / Action / Transition) are opened as
+            // their own documents by the TwinCAT editor, so their text arrives without
+            // a PROGRAM/FUNCTION_BLOCK wrapper and must be parsed standalone. Otherwise
+            // they would fall into ParseUnknown and get split (the "type on its own
+            // line" bug).
+            switch (Current.Kind)
+            {
+                case TokenKind.Keyword_Method:
+                    return ParseMethod();
+                case TokenKind.Keyword_Property:
+                    return ParseProperty();
+            }
+
             switch (Current.Kind)
             {
                 case TokenKind.Keyword_Program:
