@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <PackageManifest Version="2.0.0" xmlns="http://schemas.microsoft.com/developer/vsx-schema/2011" xmlns:x="http://schemas.microsoft.com/developer/vsx-schema-design/2011">
   <Metadata>
-    <Identity Id="STSyntaxFormatter.a1b2c3d4-e5f6-7890-abcd-ef1234567890" Version="1.0.0" Language="en-US" Publisher="STSyntaxFormatter" />
-    <DisplayName>ST Syntax Formatter 1.0.0</DisplayName>
+    <Identity Id="STSyntaxFormatter.a1b2c3d4-e5f6-7890-abcd-ef1234567890" Version="1.1.0" Language="en-US" Publisher="STSyntaxFormatter" />
+    <DisplayName>ST Syntax Formatter 1.1.0</DisplayName>
     <Description xml:space="preserve">TwinCAT3 Structured Text (ST) code formatter for Visual Studio. Supports IEC 61131-3 with TwinCAT3 OOP extensions, attributes, and pragmas.</Description>
     <Tags>TwinCAT3, Structured Text, ST, IEC 61131-3, Formatter, PLC, Beckhoff</Tags>
   </Metadata>

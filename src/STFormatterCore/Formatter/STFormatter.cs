@@ -744,11 +744,14 @@ namespace STFormatterCore.Formatter
             switch (trivia.Kind)
             {
                 case TriviaKind.Whitespace:
-                    _output.Write(trivia.Text);
-                    break;
                 case TriviaKind.NewLine:
-                    // Preserve the original newline text exactly.
-                    _output.Write(trivia.Text);
+                    // Structural whitespace/newlines are owned by the surrounding
+                    // visit methods. Reproducing them verbatim would leak the
+                    // source's blank-line layout into the formatted output and
+                    // bypass the KeepEmptyLines policy, so they are only preserved
+                    // when blank lines are being kept.
+                    if (_options.KeepEmptyLines)
+                        _output.Write(trivia.Text);
                     break;
                 case TriviaKind.SingleLineComment:
                 case TriviaKind.MultiLineComment:
@@ -1028,6 +1031,10 @@ namespace STFormatterCore.Formatter
         private void WriteClauseBlankLineIfNeeded(Token clauseToken)
         {
             if (clauseToken?.LeadingTrivia == null) return;
+            // Only preserve a source blank line before a clause keyword when blank
+            // lines are being kept. With KeepEmptyLines=false the blank is dropped
+            // (statement-block separators are emitted separately, not here).
+            if (!_options.KeepEmptyLines) return;
             int newlineCount = 0;
             foreach (var trivia in clauseToken.LeadingTrivia)
             {
@@ -1515,9 +1522,11 @@ namespace STFormatterCore.Formatter
 
             // Multi-line function calls / assignments frequently carry inline
             // trailing comments (e.g. "execute := x, // 中文注释") in the arg tokens'
-            // leading trivia. Collapsing them onto one line would drop or garble
-            // those comments. Preserve the original layout verbatim — matching
-            // TcBlack's "don't touch what you can't safely reformat" policy.
+            // trailing trivia. Collapsing them onto one line would drop or garble
+            // those comments, so preserve the tokens + their trailing comments
+            // verbatim. LEADING trivia (newlines/blanks from the source layout) is
+            // deliberately NOT reproduced — the surrounding visit methods own the
+            // line breaks and the KeepEmptyLines policy.
             if (HasInlineCommentTrivia(tokens))
             {
                 WriteTokensVerbatim(tokens);
@@ -1535,15 +1544,17 @@ namespace STFormatterCore.Formatter
         }
 
         /// <summary>
-        /// True when any token carries an inline (same-line) comment in its leading
-        /// or trailing trivia — a signal that the statement's layout must be kept.
+        /// True when any token carries an inline (same-line) comment in its TRAILING
+        /// trivia — a signal that the statement's layout must be kept verbatim.
+        /// Comments in LEADING trivia sit on their own line above the statement and
+        /// are handled by the normal reflow path (indent + KeepEmptyLines policy),
+        /// so they must NOT trigger the verbatim fallback: doing so would let source
+        /// blank lines and column-0 text leak through unformatted.
         /// </summary>
         private static bool HasInlineCommentTrivia(List<Token> tokens)
         {
             foreach (var tok in tokens)
             {
-                foreach (var t in tok.LeadingTrivia)
-                    if (t.Kind == TriviaKind.SingleLineComment) return true;
                 foreach (var t in tok.TrailingTrivia)
                     if (t.Kind == TriviaKind.SingleLineComment) return true;
             }
@@ -1590,7 +1601,12 @@ namespace STFormatterCore.Formatter
                                 _output.WriteIndent(_indent.CurrentIndent);
                             _output.Write(trivia.Text);
                             if (trivia.Kind == TriviaKind.SingleLineComment)
+                            {
                                 _output.WriteLine();
+                                // Re-indent so the token after the comment keeps its
+                                // indentation (otherwise it starts at column 0).
+                                _output.WriteIndent(_indent.CurrentIndent);
+                            }
                         }
                     }
                     // If there was a newline and we're not at line start, write continuation

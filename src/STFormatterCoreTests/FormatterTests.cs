@@ -1176,5 +1176,85 @@ namespace STFormatterCoreTests
         }
 
         #endregion
+
+        #region 51. KeepEmptyLines=false removes source blanks everywhere
+
+        [Fact]
+        public void RemoveEmptyLines_StatementArea_NoBlankBeforeEndKeywords()
+        {
+            var source =
+                "PROGRAM P\n" +
+                "IF a THEN\n" +
+                "x := 1;\n" +
+                "\n" +
+                "END_IF\n" +
+                "CASE i OF\n" +
+                "0:\n" +
+                "\n" +
+                "y := 2;\n" +
+                "\n" +
+                "z := 3;\n" +
+                "END_CASE\n" +
+                "END_PROGRAM";
+            var options = new FormatterOptions { KeepEmptyLines = false };
+            var tokens = new STLexer(source).Tokenize();
+            var cst = new STParser(tokens).Parse();
+            var result = new STFormatter(options).Format(cst, source);
+            var lines = result.Split(new[] { "\r\n", "\n" }, System.StringSplitOptions.None);
+
+            // No blank line before END_IF / END_CASE.
+            for (int i = 1; i < lines.Length; i++)
+            {
+                bool endKeyword = lines[i].Trim().Equals("END_IF") || lines[i].Trim().Equals("END_CASE");
+                if (endKeyword)
+                    Assert.False(lines[i - 1].Trim().Length == 0,
+                        $"blank before {lines[i].Trim()} is not allowed when KeepEmptyLines=false");
+            }
+
+            // No blank line between the two plain statements inside the CASE branch.
+            int y = Array.FindIndex(lines, l => l.Trim() == "y := 2;");
+            int z = Array.FindIndex(lines, l => l.Trim() == "z := 3;");
+            Assert.True(y >= 0 && z > y, "CASE branch statements not found");
+            Assert.Equal(y + 1, z);
+
+            // Only blank lines that remain are the structural separators around the
+            // outermost blocks. The first statement (IF) is the first child of the
+            // body, so it gets no leading blank; the block separation appears
+            // between END_IF and CASE.
+            int endIf = Array.FindIndex(lines, l => l.Trim() == "END_IF");
+            int caseIdx = Array.FindIndex(lines, l => l.Trim().StartsWith("CASE i"));
+            Assert.True(endIf >= 0 && caseIdx > endIf, "outer IF/CASE not found");
+            Assert.True(caseIdx - endIf == 2, "expected exactly one blank between END_IF and CASE");
+        }
+
+        [Fact]
+        public void StatementWithLeadingComment_KeepsIndentAndNoBlank_WhenRemovingEmptyLines()
+        {
+            var source =
+                "PROGRAM P\n" +
+                "CASE i OF\n" +
+                "0:\n" +
+                "y := 2;\n" +
+                "// comment\n" +
+                "z := 3;\n" +
+                "END_CASE\n" +
+                "END_PROGRAM";
+            var options = new FormatterOptions { KeepEmptyLines = false };
+            var tokens = new STLexer(source).Tokenize();
+            var cst = new STParser(tokens).Parse();
+            var result = new STFormatter(options).Format(cst, source);
+            var lines = result.Split(new[] { "\r\n", "\n" }, System.StringSplitOptions.None);
+
+            int comment = Array.FindIndex(lines, l => l.Trim() == "// comment");
+            int z = Array.FindIndex(lines, l => l.Trim() == "z := 3;");
+            Assert.True(comment >= 0 && z == comment + 1, "comment must be directly followed by the statement");
+            Assert.True(lines[comment].Length > 0 &&
+                        (lines[comment][0] == ' ' || lines[comment][0] == '\t'),
+                "comment must keep its indentation");
+            Assert.True(lines[z].Length > 0 && (lines[z][0] == ' ' || lines[z][0] == '\t'),
+                "statement after comment must keep its indentation");
+        }
+
+        #endregion
     }
 }
