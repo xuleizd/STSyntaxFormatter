@@ -21,7 +21,7 @@ namespace STFormatterVSIX.Commands
         /// <summary>
         /// Command set GUID, must match guidSTFormatterPackage in .vsct.
         /// </summary>
-        public static readonly Guid CommandSet = new Guid("b2e3c4d5-e6f7-8901-abcd-ef2345678901");
+        public static readonly Guid CommandSet = new Guid("a1b2c3d4-e5f6-7890-abcd-ef1234567890");
 
         /// <summary>
         /// VS Package that provides this command.

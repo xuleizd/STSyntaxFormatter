@@ -1,24 +1,24 @@
 <?xml version="1.0" encoding="utf-8"?>
 <CommandTable xmlns="http://schemas.microsoft.com/VisualStudio/2005-10-18/CommandTable" xmlns:xs="http://www.w3.org/2001/XMLSchema">
 
+  <!-- 参考 TcBlack：菜单挂在「工具」下拉菜单（IDM_VS_MENU_TOOLS），
+       guidSHLMainMenu 使用 vsshlids.h 里 VS shell 的标准 GUID。 -->
   <Extern href="stdidcmd.h"/>
   <Extern href="vsshlids.h"/>
 
   <Commands package="guidSTFormatterPackage">
     <Groups>
       <Group guid="guidSTFormatterCmdSet" id="MyMenuGroup" priority="0x0100">
-        <Parent guid="guidSHLMainMenu" id="IDM_VS_CTXT_ITEMNODE"/>
+        <Parent guid="guidSHLMainMenu" id="IDM_VS_MENU_TOOLS"/>
       </Group>
     </Groups>
 
     <Buttons>
       <Button guid="guidSTFormatterCmdSet" id="FormatSTCommandId" priority="0x0100" type="Button">
         <Parent guid="guidSTFormatterCmdSet" id="MyMenuGroup"/>
-        <CommandFlag>DynamicVisibility</CommandFlag>
-        <CommandFlag>DefaultInvisible</CommandFlag>
         <Strings>
-          <ButtonText>Format ST Code</ButtonText>
-          <ToolTipText>Format the Structured Text code in the active document</ToolTipText>
+          <ButtonText>格式化ST代码</ButtonText>
+          <ToolTipText>格式化当前文档中的结构化文本 (ST) 代码</ToolTipText>
         </Strings>
       </Button>
     </Buttons>
@@ -30,7 +30,6 @@
       <IDSymbol name="MyMenuGroup" value="0x1000" />
       <IDSymbol name="FormatSTCommandId" value="0x0100" />
     </GuidSymbol>
-    <GuidSymbol name="guidSHLMainMenu" value="{5e21e1a4-5b32-4f18-a8a8-6a0b5e5e2e97}" />
   </Symbols>
 
 </CommandTable>
