@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4022.12">
+  <DUT Name="EL9220StatusInput" Id="{73c96cae-7899-46dd-b69c-d456d580cfd0}">
+    <Declaration><![CDATA[TYPE EL9220StatusInput :
+STRUCT
+    enabled : BIT;
+    tripped : BIT;
+    short : BIT;
+    overlaod : BIT;
+    hwProtect : BIT;
+    overvoltage : BIT;
+    undervoltage : BIT;
+    curLvlWarning : BIT;
+    cooldownLock : BIT;
+    disBySwitch : BIT;
+    disByDI : BIT;
+    disByOutput : BIT;
+    diag : BIT;
+    txpdoSate : BIT;
+    cycleCounter1 : BIT;
+    cycleCounter0 : BIT;
+    StateDeviceSwitch : BIT;
+    StateDigitalInput : BIT;
+    Error : BIT;
+    StateReset : BIT;
+    StateSwitch : BIT;
+END_STRUCT
+END_TYPE
+]]></Declaration>
+  </DUT>
+</TcPlcObject>

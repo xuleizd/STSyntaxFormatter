@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.15">
+  <DUT Name="ST_SimpleStruct" Id="{6db80c15-9d7f-4b8c-b9e1-61a1d16c205e}">
+    <Declaration><![CDATA[TYPE ST_SimpleStruct :
+STRUCT
+    bBool : BOOL;
+    iData : INT;
+    rData : REAL;
+    sStr : STRING;
+END_STRUCT
+END_TYPE
+]]></Declaration>
+  </DUT>
+</TcPlcObject>

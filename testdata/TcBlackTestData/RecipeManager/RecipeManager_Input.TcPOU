@@ -1,0 +1,228 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.16">
+  <POU Name="RecipeManager" Id="{c7fe0e2b-7385-45ea-867a-3c7e76446c77}" SpecialFunc="None">
+    <Declaration><![CDATA[FUNCTION_BLOCK RecipeManager
+VAR
+    // RecipeManCommands 功能块实例
+    _recipeCmd : RecipeManCommands;
+    
+    // 配方定义的名称
+    _recipeDefName : STRING := 'Recipes';
+    
+    // 每个功能的上升沿触发器
+    _trigRead : R_TRIG;
+    _trigWrite : R_TRIG;
+    _trigGetList : R_TRIG;
+    _trigCreate : R_TRIG;
+    _trigDelete : R_TRIG;
+    
+    // 内部状态存储
+    _lastError : DWORD;
+    _recipeCount : INT;
+    _recipeNames : ARRAY[0..99] OF STRING; // 内部缓存名称列表
+END_VAR
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[]]></ST>
+    </Implementation>
+    <Folder Name="NewFolder1" Id="{a132b8a2-3f0b-4cca-a8e2-fb0d6d745204}" />
+    <Action Name="ACT" Id="{0c8ce8a1-18fd-4879-a668-b9069a0331b8}">
+      <Implementation>
+        <ST><![CDATA[           GetLastError:= _lastError;]]></ST>
+      </Implementation>
+    </Action>
+    <Action Name="ACT_1" Id="{5df130ac-b04e-4ee8-b075-7d696229fe6c}" FolderPath="NewFolder1\">
+      <Implementation>
+        <ST><![CDATA[           GetLastError:= _lastError;]]></ST>
+      </Implementation>
+    </Action>
+    <Method Name="DeleteRecipe" Id="{adf5da91-abf1-464e-9d70-c5135f445f3d}">
+      <Declaration><![CDATA[METHOD PUBLIC DeleteRecipe  : DWORD
+VAR_INPUT
+	   bExecute : BOOL;          // 上升沿触发执行
+    RecipeName : STRING;      // 要删除的配方名称
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[    _trigDelete(CLK := bExecute);
+    
+    IF _trigDelete.Q THEN
+        DeleteRecipe := _recipeCmd.DeleteRecipe(
+            RecipeDefinitionName := _recipeDefName,
+            RecipeName := RecipeName
+        );
+        _lastError := DeleteRecipe;
+    ELSE
+        DeleteRecipe := _lastError;
+    END_IF]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="GetLastError" Id="{9fe825be-a6e5-4452-959a-2584da494baa}">
+      <Declaration><![CDATA[METHOD PUBLIC GetLastError  : DWORD
+VAR_INPUT
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[            GetLastError := _lastError;]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="GetRecipeList" Id="{858dccae-2ef4-4d51-af83-fbc69c4d92c8}">
+      <Declaration><![CDATA[METHOD PUBLIC GetRecipeList  : DWORD
+VAR_INPUT
+    bExecute : BOOL;              // 上升沿触发执行
+END_VAR
+VAR_OUTPUT
+    Count : INT;                  // 配方总数
+END_VAR
+VAR_IN_OUT
+    NamesList : ARRAY[*] OF STRING;  // 配方名称列表（引用传递，避免拷贝）
+END_VAR
+VAR
+    i : INT;
+    arraySize : DINT;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[ _trigGetList(CLK := bExecute);
+    
+    IF _trigGetList.Q THEN
+        // 1. 获取配方数量
+        Count := _recipeCmd.GetRecipeCount(
+            RecipeDefinitionName := _recipeDefName
+        );
+        _recipeCount := Count;
+        
+        // 2. 获取名称列表
+        IF Count > 0 THEN
+            arraySize := UPPER_BOUND(NamesList, 1) + 1;
+            GetRecipeList := _recipeCmd.GetRecipeNames(
+                RecipeDefinitionName := _recipeDefName,
+                pStrings := ADR(NamesList),  // 注意：这里仍需 ADR，因为底层 API 要求指针
+                iSize := arraySize,
+                iStartIndex := 0
+            );
+            _lastError := GetRecipeList;
+            
+            // 同时更新内部缓存
+            FOR i := 0 TO MIN(Count, 99) - 1 DO
+                _recipeNames[i] := NamesList[i];
+            END_FOR
+        ELSE
+            GetRecipeList := 0;
+            _lastError := 0;
+        END_IF
+    ELSE
+        // 未触发时返回缓存的数据
+        Count := _recipeCount;
+        FOR i := 0 TO MIN(_recipeCount, 99) - 1 DO
+            NamesList[i] := _recipeNames[i];
+        END_FOR
+        GetRecipeList := _lastError;
+    END_IF]]></ST>
+      </Implementation>
+    </Method>
+    <Property Name="Prop" Id="{35a277a0-0ed0-4092-bf49-053d263b42cf}">
+      <Declaration><![CDATA[PROPERTY PUBLIC Prop : dword]]></Declaration>
+      <Get Name="Get" Id="{d48e6295-165f-40d7-a851-d37a53427aad}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[           GetLastError:= _lastError;]]></ST>
+        </Implementation>
+      </Get>
+      <Set Name="Set" Id="{8323edc9-9718-47a1-b2a2-de0737216854}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[           GetLastError:= _lastError;]]></ST>
+        </Implementation>
+      </Set>
+    </Property>
+    <Method Name="ReadRecipe" Id="{7fc156e6-5153-4e2d-bcc4-16a66cd676c8}">
+      <Declaration><![CDATA[METHOD PUBLIC ReadRecipe  : DWORD
+VAR_INPUT
+	   bExecute : BOOL;          // 上升沿触发执行
+     RecipeName : STRING;      // 要读取的配方名称
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[// 上升沿检测
+    _trigRead(CLK := bExecute);
+    
+    IF _trigRead.Q THEN
+        ReadRecipe := _recipeCmd.LoadAndWriteRecipe(
+            RecipeDefinitionName := _recipeDefName,
+            RecipeName := RecipeName
+        );
+        _lastError := ReadRecipe;
+    ELSE
+                  ReadRecipe := _lastError;  // 未触发时返回上次错误码
+    END_IF]]></ST>
+      </Implementation>
+    </Method>
+    <Transition Name="TRANS" Id="{c68f74e1-1600-463b-b9ff-af4e07546d32}">
+      <Implementation>
+        <ST><![CDATA[           GetLastError:= _lastError;]]></ST>
+      </Implementation>
+    </Transition>
+    <Method Name="WriteRecipe" Id="{23fdaa79-fda1-4643-84d1-4ceb69700ade}">
+      <Declaration><![CDATA[METHOD PUBLIC WriteRecipe  : DWORD
+VAR_INPUT
+	    bExecute : BOOL;          // 上升沿触发执行
+    RecipeName : STRING;      // 要保存的配方名称
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[ _trigWrite(CLK := bExecute);
+    
+    IF _trigWrite.Q THEN
+        WriteRecipe := _recipeCmd.ReadAndSaveRecipe(
+            RecipeDefinitionName := _recipeDefName,
+            RecipeName := RecipeName
+        );
+        _lastError := WriteRecipe;
+    ELSE
+        WriteRecipe := _lastError;
+    END_IF]]></ST>
+      </Implementation>
+    </Method>
+    <LineIds Name="RecipeManager">
+      <LineId Id="6721" Count="0" />
+    </LineIds>
+    <LineIds Name="RecipeManager.ACT">
+      <LineId Id="1" Count="0" />
+    </LineIds>
+    <LineIds Name="RecipeManager.ACT_1">
+      <LineId Id="1" Count="0" />
+    </LineIds>
+    <LineIds Name="RecipeManager.DeleteRecipe">
+      <LineId Id="8" Count="9" />
+      <LineId Id="5" Count="0" />
+    </LineIds>
+    <LineIds Name="RecipeManager.GetLastError">
+      <LineId Id="5" Count="0" />
+    </LineIds>
+    <LineIds Name="RecipeManager.GetRecipeList">
+      <LineId Id="28" Count="34" />
+      <LineId Id="5" Count="0" />
+    </LineIds>
+    <LineIds Name="RecipeManager.Prop.Get">
+      <LineId Id="2" Count="0" />
+    </LineIds>
+    <LineIds Name="RecipeManager.Prop.Set">
+      <LineId Id="2" Count="0" />
+    </LineIds>
+    <LineIds Name="RecipeManager.ReadRecipe">
+      <LineId Id="8" Count="10" />
+      <LineId Id="5" Count="0" />
+    </LineIds>
+    <LineIds Name="RecipeManager.TRANS">
+      <LineId Id="1" Count="0" />
+    </LineIds>
+    <LineIds Name="RecipeManager.WriteRecipe">
+      <LineId Id="8" Count="9" />
+      <LineId Id="5" Count="0" />
+    </LineIds>
+  </POU>
+</TcPlcObject>

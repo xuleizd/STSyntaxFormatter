@@ -1,0 +1,17 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.16">
+  <DUT Name="ST_ProdEntry1" Id="{da231298-633f-4921-9e7c-4ff2d873d6f0}">
+    <Declaration><![CDATA[TYPE ST_ProdEntry1 :
+STRUCT
+    ID : LINT;    JS : WSTRING(50);
+    FTPBROWSE : BOOL;
+    FTPDOWN : BOOL;
+    DATAEXPORT : BOOL;
+    DICTEDIT : BOOL;
+    CREATETAB : BOOL;
+
+END_STRUCT
+END_TYPE
+]]></Declaration>
+  </DUT>
+</TcPlcObject>

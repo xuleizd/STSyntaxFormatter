@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4022.6">
+  <DUT Name="TrippedInfoData" Id="{28aca86c-808c-4464-9665-c431efd90aae}">
+    <Declaration><![CDATA[{attribute 'pack_mode' := '0'}
+TYPE TrippedInfoData :
+STRUCT
+    cntShortCurcuit : DWORD;
+    cntOverload : DWORD;
+    cntHWProtect : DWORD;
+    cntOvervolt : DWORD;
+    cntUndervolt : DWORD;
+    remaCoolDown : WORD;
+    maxCurrDragInd : WORD;
+END_STRUCT
+END_TYPE
+]]></Declaration>
+  </DUT>
+</TcPlcObject>

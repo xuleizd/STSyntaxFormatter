@@ -1,0 +1,28 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.12">
+  <DUT Name="EL1809" Id="{352de498-bd22-4075-b08e-16b96851faeb}">
+    <Declaration><![CDATA[TYPE EL1809 :
+STRUCT
+	bIn1 ,
+	bIn2 ,
+	bIn3 ,
+	bIn4 ,
+	bIn5 ,
+	bIn6 ,
+	bIn7 ,
+	bIn8 ,
+	bIn9 ,
+	bIn10,
+	bIn11,
+	bIn12,
+	bIn13,
+	bIn14,
+	bIn15,
+	bIn16		AT%I*	:BOOL;
+	bWcState	AT%I*	:BOOL;
+	uiState		AT%I*	:UINT;
+END_STRUCT
+END_TYPE
+]]></Declaration>
+  </DUT>
+</TcPlcObject>

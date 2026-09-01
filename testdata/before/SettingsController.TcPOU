@@ -1,0 +1,250 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4022.12">
+  <POU Name="SettingsController" Id="{bde52f74-0237-451b-a140-3ca6212197b4}" SpecialFunc="None">
+    <Declaration><![CDATA[FUNCTION_BLOCK SettingsController
+
+
+VAR_INPUT
+
+masterNetId         : T_AmsNetId;;
+
+slaveAdr            : UINT;;
+
+setSwitch           : UINT;;
+
+changeSwitch        : BOOL;;
+
+setNomCurrent       : UINT;;
+
+changeNomCurrent    : BOOL;;
+
+setCharacter        : UINT;;
+
+changeCharacter     : BOOL;;
+
+setCurrLvl          : UINT;;
+
+changeCurrLvl       : BOOL;;
+
+setFuseInit         : UINT;;
+
+changeFuseInit      : BOOL;;
+
+setInputFnc         : UINT;;
+
+changeInputFnc      : BOOL;;
+
+setUnderVoltLvl     : UINT;;
+
+changeUnderVoltLvl  : BOOL;;
+
+setOverVoltBeha     : UINT;;
+
+changeOverVoltBeha  : BOOL;;
+
+setRevCurrFilter    : UINT;;
+
+changeRevCurrFilter : BOOL;;
+
+enable              : BOOL;;
+
+    END_VAR
+
+
+VAR_OUTPUT
+
+settingsReadData : SettingsData;;
+
+readPassProtect  : BYTE:=0;;
+
+    END_VAR
+
+
+VAR OF
+
+state              : UINT:=0;;
+
+count              : UINT;;
+
+readSwitch         : UINT;;
+
+readNomCurrent     : UINT;;
+
+readCharacter      : UINT;;
+
+readCurrLvl        : UINT;;
+
+readFuseInit       : UINT;;
+
+readInputFnc       : UINT;;
+
+readUnderVoltLvl   : UINT;;
+
+readOverVoltBeha   : UINT;;
+
+readRevCurrFilter  : UINT;;
+
+settingController  : ARRAY[1..9];
+        CoeSettingControl;;
+
+settingRead        : ReadCoeData;;
+
+passProtectRead    : ReadCoeData;;
+
+hasBeenEnabled     : BOOL:=FALSE;;
+
+settingController4 : CoeSettingControl2;;
+
+settingController7 : CoeSettingControl2;;
+
+    END_VAR
+
+END_FUNCTION_BLOCK
+
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[END_PROGRAM
+
+settingRead (masterNetId := masterNetId,
+ slaveAdr := slaveAdr,
+ index := 16#8000,
+ data := ADR (settingsReadData),
+ length := SIZEOF (settingsReadData),
+ enable := TRUE);
+
+passProtectRead (masterNetId := masterNetId,
+ slaveAdr := slaveAdr,
+ index := 16#F009,
+ subIndex := 0,
+ data := ADR (readPassProtect),
+ length := SIZEOF (readPassProtect),
+ enable := TRUE);
+
+
+FOR count := 1 TO settingsCount DO
+
+settingController [count] (masterNetId := masterNetId,
+ slaveAdr := slaveAdr,
+ settingData := settingsData [count]);
+
+    END_FOR
+
+settingController4 (masterNetId := masterNetId,
+ slaveAdr := slaveAdr,
+ settingData := settingsData [4]);
+
+settingController7 (masterNetId := masterNetId,
+ slaveAdr := slaveAdr,
+ settingData := settingsData [7]);
+
+settingController [1].enable := changeSwitch;
+
+settingController [2].enable := changeNomCurrent;
+
+settingController [3].enable := changeCharacter;
+
+    //settingController[4].enable	:= changeCurrLvl;
+
+
+ settingController4.enable := changeCurrLvl;
+
+settingController [5].enable := changeFuseInit;
+
+settingController [6].enable := changeInputFnc;
+
+    //settingController[7].enable := changeUnderVoltLvl;
+
+
+ settingController7.enable := changeUnderVoltLvl;
+
+settingController [8].enable := changeOverVoltBeha;
+
+settingController [9].enable := changeRevCurrFilter;
+
+
+settingController [1].writeIndex := setSwitch;
+
+settingController [2].writeIndex := setNomCurrent;
+
+settingController [3].writeIndex := setCharacter;
+
+    //settingController[4].writeIndex:=setCurrLvl;
+
+
+ settingController4.writeIndex := setCurrLvl;
+
+settingController [5].writeIndex := setFuseInit;
+
+settingController [6].writeIndex := setInputFnc;
+
+    //settingController[7].writeIndex:=setUnderVoltLvl;
+
+
+ settingController7.writeIndex := setUnderVoltLvl;
+
+settingController [8].writeIndex := setOverVoltBeha;
+
+settingController [9].writeIndex := setRevCurrFilter;
+
+
+readSwitch := DataToIndex (settingsData [1].settingData, settingsData [1].settingDataLength, settingsReadData.switchProgCtrl);
+
+readNomCurrent := DataToIndex (settingsData [2].settingData, settingsData [2].settingDataLength, settingsReadData.nomCurr);
+
+readCharacter := DataToIndex (settingsData [3].settingData, settingsData [3].settingDataLength, settingsReadData.character);
+
+readCurrLvl := settingsReadData.currLvlWarn; //(settingsData[4].settingData,settingsData[4].settingDataLength, settingsReadData.currLvlWarn);
+    
+
+ readFuseInit := DataToIndex (settingsData [5].settingData, settingsData [5].settingDataLength, settingsReadData.fuseInitState);
+
+readInputFnc := DataToIndex (settingsData [6].settingData, settingsData [6].settingDataLength, settingsReadData.inputFnc);
+
+readUnderVoltLvl := settingsReadData.undervoltLvl; //DataToIndex(settingsData[7].settingData,settingsData[7].settingDataLength, settingsReadData.undervoltLvl);
+    
+
+ readOverVoltBeha := DataToIndex (settingsData [8].settingData, settingsData [8].settingDataLength, settingsReadData.overvoltBeha);
+
+readRevCurrFilter := DataToIndex (settingsData [9].settingData, settingsData [9].settingDataLength, settingsReadData.reverseCurrFilt);
+]]></ST>
+    </Implementation>
+    <LineIds Name="SettingsController">
+      <LineId Id="133" Count="4" />
+      <LineId Id="230" Count="0" />
+      <LineId Id="235" Count="0" />
+      <LineId Id="231" Count="1" />
+      <LineId Id="239" Count="0" />
+      <LineId Id="233" Count="1" />
+      <LineId Id="130" Count="0" />
+      <LineId Id="138" Count="0" />
+      <LineId Id="9" Count="0" />
+      <LineId Id="25" Count="0" />
+      <LineId Id="32" Count="0" />
+      <LineId Id="66" Count="0" />
+      <LineId Id="123" Count="0" />
+      <LineId Id="299" Count="1" />
+      <LineId Id="285" Count="0" />
+      <LineId Id="302" Count="1" />
+      <LineId Id="301" Count="0" />
+      <LineId Id="289" Count="3" />
+      <LineId Id="298" Count="0" />
+      <LineId Id="293" Count="0" />
+      <LineId Id="286" Count="1" />
+      <LineId Id="306" Count="0" />
+      <LineId Id="288" Count="0" />
+      <LineId Id="284" Count="0" />
+      <LineId Id="64" Count="0" />
+      <LineId Id="63" Count="0" />
+      <LineId Id="65" Count="0" />
+      <LineId Id="86" Count="1" />
+      <LineId Id="304" Count="0" />
+      <LineId Id="88" Count="2" />
+      <LineId Id="305" Count="0" />
+      <LineId Id="70" Count="0" />
+      <LineId Id="140" Count="0" />
+      <LineId Id="152" Count="0" />
+      <LineId Id="150" Count="0" />
+      <LineId Id="187" Count="7" />
+    </LineIds>
+  </POU>
+</TcPlcObject>

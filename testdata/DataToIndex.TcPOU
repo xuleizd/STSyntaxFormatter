@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4022.6">
+  <POU Name="DataToIndex" Id="{c1d7d7e4-c94c-47fa-b620-2c1290dbaa30}" SpecialFunc="None">
+    <Declaration><![CDATA[FUNCTION DataToIndex : UINT
+
+
+VAR_INPUT
+
+data       : POINTERTOUINT;;
+
+dataLength : UINT;;
+
+value      : UINT;;
+
+    END_VAR
+
+
+VAR
+
+count : UINT;;
+
+    END_VAR
+
+END_FUNCTION
+
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[END_PROGRAM
+
+
+FOR count := 1 TO dataLength BY 1 DO
+
+IF data^= value THEN
+
+DataToIndex := count;
+
+RETURN;
+
+        END_IF
+
+data := data + SIZEOF (data^);
+
+    END_FOR
+]]></ST>
+    </Implementation>
+    <LineIds Name="DataToIndex">
+      <LineId Id="12" Count="2" />
+      <LineId Id="27" Count="0" />
+      <LineId Id="15" Count="2" />
+      <LineId Id="7" Count="0" />
+    </LineIds>
+  </POU>
+</TcPlcObject>

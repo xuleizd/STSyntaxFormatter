@@ -1,0 +1,179 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4022.10">
+  <POU Name="MAIN" Id="{d2958ee3-234f-4224-9f3d-ef8b91aac872}" SpecialFunc="None">
+    <Declaration><![CDATA[PROGRAM MAIN
+VAR
+	el9220ch1: EL9220ChannelInput;
+	cmdCurrent:STRING(11) := 'CURR ';
+	cmdInputOn: STRING(10) := 'INPUT ON$L$R';
+	//msrPoti AT%I*: INT;
+	resetButton: BOOL;
+	setButton: BOOL;
+	resetOut AT%Q*: BOOL;
+	setOut AT%Q*: BOOL;
+	lastModTimestamp: LREAL;
+	lastTrippedTimestamp: LREAL;
+	lastTrippedData: LastTrippedData;
+	lastModData: LastModData;
+	trippedInfoData: TrippedInfoData;
+	settingsController: SettingsController;
+	readLastTrippedData: ReadCoeData;
+	readLastModData: ReadCoeData;
+	readTrippedInfoData: ReadCoeData;
+	getTrippedTime: GetTimeNowString;
+	getStartTime: GetTimeNowString;
+	slaveAdr AT%I*: UINT;
+	toggle: BOOL;
+	(* Alte Hardware
+	PushButton_ShortCircuit AT%I*:BOOL;							
+	LED_PushButton_ShortCircuit AT%Q*:BOOL;						
+	LED_PushButton_OnOffReset AT%Q*:BOOL;
+	LED_EL2008_Front_1 AT%Q*:ARRAY[1..8]OF BOOL;
+	LED_EL2008_Front_2 AT%Q*:ARRAY[1..8]OF BOOL;
+	LED_EL2008_Front_3 AT%Q*:ARRAY[1..8]OF BOOL;
+	LED_EL2008_Front_4 AT%Q*:ARRAY[1..8]OF BOOL;
+	*)
+	i:INT;
+	TC_Restart:TC_Restart;
+	TON_Restart:TON;
+END_VAR
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[(*LED-Ring am Messepräsenter anmachen*)
+(*
+LED_PushButton_ShortCircuit:=PushButton_ShortCircuit;
+LED_PushButton_OnOffReset:=NOT el9220ch1.status.cooldownLock AND el9220ch1.status.tripped;
+
+TON_Restart(IN:= PushButton_ShortCircuit, PT:= T#15S, Q=> , ET=> );
+
+TC_Restart(
+	NETID:= '', 
+	RESTART:= TON_Restart.Q, 
+	TMOUT:= T#10S, 
+	BUSY=> , 
+	ERR=> , 
+	ERRID=> );
+
+
+(*LEDs an den Ausgangsklemmen simulierend ausschakten, wenn Sicherungsklemme ausgeschaltet oder ausgelöst hat*)
+FOR i:=1 TO 8 DO
+	IF el9220ch1.status.enabled THEN
+		LED_EL2008_Front_1[i]:=TRUE;
+		LED_EL2008_Front_2[i]:=TRUE;
+		LED_EL2008_Front_3[i]:=TRUE;
+		LED_EL2008_Front_4[i]:=TRUE;
+	ELSE
+		LED_EL2008_Front_1[i]:=FALSE;
+		LED_EL2008_Front_2[i]:=FALSE;
+		LED_EL2008_Front_3[i]:=FALSE;
+		LED_EL2008_Front_4[i]:=FALSE;			
+	END_IF
+END_FOR
+*)
+
+
+// Generieren der AMS Net Id
+Global.masterNetId	:= F_CreateAmsNetId(arrMasterNetId);
+
+
+
+IF resetButton THEN
+	resetOut := TRUE;
+	resetButton := FALSE;
+ELSE
+	resetOut := FALSE;
+END_IF
+IF setButton THEN
+	IF el9220ch1.status.tripped THEN
+		resetOut := TRUE;
+	ELSE
+		setOut := TRUE;
+	END_IF
+	setButton := FALSE;
+ELSE
+	setOut := FALSE;
+	resetOut := FALSE;
+END_IF
+
+getTrippedTime(enable:=el9220ch1.status.tripped);
+getStartTime(enable:=TRUE);
+
+settingsController(masterNetId:=masterNetId,
+					slaveAdr:=slaveAdr,
+					enable:=TRUE);
+readLastTrippedData(masterNetId:=masterNetId,
+					slaveAdr:=slaveAdr,
+					index:=16#9002,
+					data:=ADR(lastTrippedData),
+					length:=SIZEOF(lastTrippedData),
+					enable:=TRUE);
+readLastModData(masterNetId:=masterNetId,
+					slaveAdr:=slaveAdr,
+					index:=16#9003,
+					data:=ADR(lastModData),
+					length:=SIZEOF(lastModData),
+					enable:=TRUE);
+lastModTimestamp := lastModData.timestamp / 1E6;
+readTrippedInfoData(masterNetId:=masterNetId,
+					slaveAdr:=slaveAdr,
+					index:=16#9000,
+					data:=ADR(trippedInfoData),
+					length:=SIZEOF(trippedInfoData),
+					enable:=TRUE);
+lastTrippedTimestamp := lastTrippedData.timestamp / 1E6;]]></ST>
+    </Implementation>
+    <LineIds Name="MAIN">
+      <LineId Id="391" Count="0" />
+      <LineId Id="576" Count="0" />
+      <LineId Id="67" Count="0" />
+      <LineId Id="390" Count="0" />
+      <LineId Id="533" Count="1" />
+      <LineId Id="531" Count="0" />
+      <LineId Id="525" Count="5" />
+      <LineId Id="509" Count="0" />
+      <LineId Id="492" Count="0" />
+      <LineId Id="431" Count="0" />
+      <LineId Id="429" Count="0" />
+      <LineId Id="432" Count="0" />
+      <LineId Id="436" Count="0" />
+      <LineId Id="434" Count="0" />
+      <LineId Id="440" Count="2" />
+      <LineId Id="437" Count="0" />
+      <LineId Id="443" Count="2" />
+      <LineId Id="438" Count="1" />
+      <LineId Id="435" Count="0" />
+      <LineId Id="433" Count="0" />
+      <LineId Id="614" Count="1" />
+      <LineId Id="613" Count="0" />
+      <LineId Id="616" Count="0" />
+      <LineId Id="618" Count="1" />
+      <LineId Id="617" Count="0" />
+      <LineId Id="95" Count="0" />
+      <LineId Id="97" Count="0" />
+      <LineId Id="99" Count="4" />
+      <LineId Id="233" Count="2" />
+      <LineId Id="104" Count="0" />
+      <LineId Id="237" Count="0" />
+      <LineId Id="105" Count="2" />
+      <LineId Id="238" Count="0" />
+      <LineId Id="98" Count="0" />
+      <LineId Id="292" Count="0" />
+      <LineId Id="291" Count="0" />
+      <LineId Id="320" Count="0" />
+      <LineId Id="11" Count="0" />
+      <LineId Id="15" Count="0" />
+      <LineId Id="112" Count="0" />
+      <LineId Id="130" Count="0" />
+      <LineId Id="149" Count="1" />
+      <LineId Id="207" Count="2" />
+      <LineId Id="172" Count="2" />
+      <LineId Id="199" Count="0" />
+      <LineId Id="195" Count="1" />
+      <LineId Id="200" Count="0" />
+      <LineId Id="263" Count="0" />
+      <LineId Id="201" Count="4" />
+      <LineId Id="151" Count="0" />
+      <LineId Id="264" Count="0" />
+    </LineIds>
+  </POU>
+</TcPlcObject>

@@ -1,0 +1,58 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.16">
+  <POU Name="MAIN" Id="{5790b62b-c275-4160-9be2-3280a5f530dd}" SpecialFunc="None">
+    <Declaration><![CDATA[PROGRAM MAIN
+VAR  myRecipeMgr1 : RecipeManager;
+myRecipeMgr : RecipeManager;
+osUPS : FB_S_UPS_BAPI;
+END_VAR
+
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[// 读取配方（只需要给 bReadRecipe 一个上升沿）
+myRecipeMgr.ReadRecipe(
+    execute := gvl.RecipeOp.ReadRecipe,      // 在 HMI 或程序中置位即可
+    recipeName := gvl.CurrentRecipeName
+    );
+// 错误码通过返回值或 GetLastError() 获取
+
+// 写入配方
+myRecipeMgr.WriteRecipe(
+    execute := gvl.RecipeOp.WriteRecipe,
+    recipeName := gvl.CurrentRecipeName
+    );
+
+// 获取配方列表
+myRecipeMgr.GetRecipeList(
+    execute := gvl.RecipeOp.GetRecipeList,
+    count => gvl.RecipeCnt,
+    NamesList := gvl.RecipeNames
+    );
+
+// 新增配方
+myRecipeMgr.CreateRecipe(
+    execute := gvl.RecipeOp.CreateRecipe,
+    recipeName := gvl.CurrentRecipeName
+    );
+
+// 删除配方
+myRecipeMgr.DeleteRecipe(
+    execute := gvl.RecipeOp.DeleteRecipe,
+    RecipeName := gvl.CurrentRecipeName
+    );
+
+gvl.ErrorRecipeOp := myRecipeMgr.LastError;
+
+PRG_LD();
+
+
+
+osUPS(sNetID:='192.168.77.10.1.1');
+]]></ST>
+    </Implementation>
+    <LineIds Name="MAIN">
+      <LineId Id="1827" Count="38" />
+      <LineId Id="2" Count="0" />
+    </LineIds>
+  </POU>
+</TcPlcObject>

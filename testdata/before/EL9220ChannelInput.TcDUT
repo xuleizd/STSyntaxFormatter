@@ -1,0 +1,15 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4020.12">
+  <DUT Name="EL9220ChannelInput" Id="{5dd48cb9-7874-4e81-8f40-14fca077ddd2}">
+    <Declaration><![CDATA[TYPE EL9220ChannelInput :
+STRUCT
+	status AT%I*:EL9220StatusInput;
+	load AT%I*:UINT;
+	current AT%I*:UINT;
+	voltagIn AT%I*:UINT;
+	voltageOut AT%I*:UINT;
+END_STRUCT
+END_TYPE
+]]></Declaration>
+  </DUT>
+</TcPlcObject>

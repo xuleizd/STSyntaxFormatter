@@ -1,0 +1,159 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.16">
+  <POU Name="RecipeOp" Id="{c7fe0e2b-7385-45ea-867a-3c7e76446c77}" SpecialFunc="None">
+    <Declaration><![CDATA[FUNCTION_BLOCK RecipeOp
+VAR
+    fbRecipeManCommands : RecipeManCommands;
+    sDefName : STRING := 'Recipes';
+    iRecipeCnt : INT; // 存储配方数量的变量
+    dwGetRcpNames : DWORD; // 存储GetRecipeNames方法返回值的变量
+    asRecipeNames : ARRAY[0..99] OF STRING; // 存放所有配方名称的数组，长度需根据实际项目评估
+    i : INT; // 用于循环的计数器
+    sRecipeName : STRING := 'r1'; // 要加载的配方名称
+    dwResult : DWORD;
+    bCreateRecipe : BOOL;
+    bLoadRecipe : BOOL;
+    bReadRecipes : BOOL;
+    bDone : BOOL;
+END_VAR
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[IF bCreateRecipe THEN
+    dwResult := fbRecipeManCommands.CreateRecipe( RecipeDefinitionName := sDefName, RecipeName := sRecipeName );
+    
+    IF dwResult = 0 THEN
+        bDone := TRUE;
+    ELSE
+        bDone := FALSE;
+    END_IF
+    
+    bCreateRecipe := FALSE;
+END_IF
+
+
+IF bLoadRecipe THEN
+    dwResult := fbRecipeManCommands.LoadAndWriteRecipe( RecipeDefinitionName := sDefName, RecipeName := sRecipeName );
+    
+    IF dwResult = 0 THEN
+        bDone := TRUE;
+    ELSE
+        bDone := FALSE;
+    END_IF
+    bLoadRecipe := FALSE;
+END_IF
+
+
+IF bCreateRecipe THEN
+    iRecipeCnt := fbRecipeManCommands.GetRecipeCount(sDefName);
+    IF iRecipeCnt <> 0 THEN
+        dwGetRcpNames := fbRecipeManCommands.GetRecipeNames(
+        sDefName,     // 配方定义名称
+        ADR(asRecipeNames),    // 指向存储名称的数组指针
+        iRecipeCnt,          // 要获取的配方数量
+        0                    // 起始索引，从0开始
+        );
+    END_IF
+END_IF
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+]]></ST>
+    </Implementation>
+    <LineIds Name="RecipeOp">
+      <LineId Id="4161" Count="81" />
+      <LineId Id="9" Count="0" />
+    </LineIds>
+  </POU>
+</TcPlcObject>

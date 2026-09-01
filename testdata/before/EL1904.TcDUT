@@ -1,0 +1,16 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.12">
+  <DUT Name="EL1904" Id="{47617f99-8f16-4aae-bdb2-7d6894ed31c6}">
+    <Declaration><![CDATA[TYPE EL1904 :
+STRUCT
+	bIn1 ,
+	bIn2 ,
+	bIn3 ,
+	bIn4 		AT%I*	:BOOL;
+	bWcState	AT%I*	:BOOL;
+	uiState		AT%I*	:UINT;
+END_STRUCT
+END_TYPE
+]]></Declaration>
+  </DUT>
+</TcPlcObject>

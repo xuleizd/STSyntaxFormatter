@@ -1,0 +1,145 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.12">
+  <POU Name="_Safety" Id="{db1fe4b8-bd38-4377-aeef-cf8160d224bc}" SpecialFunc="None">
+    <Declaration><![CDATA[PROGRAM _Safety
+
+
+VAR : 
+ : 
+ : 
+ : 
+ : 
+ : : : : :
+
+Err_Ack AT %;
+        Q*;
+        BOOL;; //当出现了通讯报错时 用来做安全应答
+
+Run_Stop AT %;
+        Q*;
+        BOOL;; //启动或停止安全程序运行
+
+Restart AT %;
+        Q*;
+        BOOL;; //重启安全程序
+
+
+Com_err AT %;
+        I*;
+        BOOL;; //用来显示通讯报错
+
+FB_err AT %;
+        I*;
+        BOOL;; //用来显示功能块报错
+
+
+safetySignal : BOOL;;
+
+iSafeStep    : INT;;
+
+isaferun     : INT;;
+
+SafeRun AT %;
+        I*;
+        BOOL;;
+
+lightcurtain AT %;
+        I*;
+        BOOL;;
+
+safedoor1 AT %;
+        I*;
+        BOOL;;
+
+safedoor2 AT %;
+        I*;
+        BOOL;;
+
+scrambutton AT %;
+        I*;
+        BOOL;;
+
+
+bSafeRestart : BOOL;;
+
+TON3         : ton;;
+
+    END_VAR
+
+END_PROGRAM
+
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[END_PROGRAM
+
+    //CASE isaferun of
+
+
+    //	0:	IF SafeRun THEN
+ 
+
+    //			Run_Stop:=	1;
+ 
+
+    //			isaferun:=	1;
+ 
+
+    //		END_IF
+ 
+
+    //
+ 
+
+    //	1:	TON3(IN:=NOT TON3.Q , PT:=T#500MS , Q=> , ET=> );
+ 
+
+    //		IF  Run_Stop AND TON3.Q THEN
+ 
+
+    //			SafeRun:= 0;
+ 
+
+    //			Run_Stop:= 0;
+ 
+
+    //			isaferun:=	0;
+ 
+
+    //		END_IF
+ 
+
+    //END_CASE\
+ 
+
+ IF SafeRun THEN
+ Run_Stop := 1;
+
+SafeRun := 0;
+
+END_IF
+
+ CASE iSafeStep OF
+ 0 : IF bSafeRestart THEN
+ restart := 1;
+
+iSafeStep := 1;
+
+END_IF
+ 1 :
+ TON3 (IN := NOT TON3.Q, PT := T#500MS, Q = >, ET = >);
+
+IF Restart = 1 AND TON3.Q THEN
+
+Restart := 0;
+
+bSafeRestart := 0;
+
+iSafeStep := 0;
+
+    END_IF
+
+END_CASE
+]]></ST>
+    </Implementation>
+  </POU>
+</TcPlcObject>

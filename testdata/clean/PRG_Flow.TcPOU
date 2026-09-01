@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.12">
+  <POU Name="PRG_Flow" Id="{62474feb-6d0c-4d83-8ea1-1897b651e856}" SpecialFunc="None">
+    <Declaration><![CDATA[PROGRAM PRG_Flow
+
+
+VAR
+
+i : INT;;
+
+    END_VAR
+
+END_PROGRAM
+
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[END_PROGRAM
+
+
+    //单个功能验证测试
+
+
+ Act_Manual ();
+
+
+    //流程寸进
+
+
+ Act_Step ();
+
+
+    //流程空跑
+
+
+ Act_FlowTest ();
+
+
+    //自动流程
+
+
+ Act_Auto ();
+]]></ST>
+    </Implementation>
+    <Action Name="Act_Auto" Id="{e378297c-517d-429c-9080-6c35707e882b}">
+      <Implementation>
+        <ST><![CDATA[(*自动控制流程中—>需要用到的控制参数尽量在哪里用就在那里复位清除*)
+
+END_PROGRAM
+]]></ST>
+      </Implementation>
+    </Action>
+    <Action Name="Act_FlowTest" Id="{faba86e8-2cba-4e76-af39-3e78e0fc3640}">
+      <Implementation>
+        <ST><![CDATA[END_PROGRAM
+
+    // 上使能
+
+
+    //FOR i:=1 TO iAxisMaxNum BY 1 DO
+ 
+
+    //	afbAxis[i].xPowerEn := TRUE;
+ 
+
+    //	afbAxis[i].xPosDirEn := TRUE;
+ 
+
+    //	afbAxis[i].xNegDirEn := TRUE;
+ 
+
+    //	afbAxis[i].lrOverride := 100;
+ 
+
+    //END_FOR
+]]></ST>
+      </Implementation>
+    </Action>
+    <Action Name="Act_Manual" Id="{87e6a905-5ee0-46f6-b682-fa61e0c45827}">
+      <Implementation>
+        <ST><![CDATA[]]></ST>
+      </Implementation>
+    </Action>
+    <Action Name="Act_Step" Id="{afe1f34b-674e-48d4-8d68-833b91b590f7}">
+      <Implementation>
+        <ST><![CDATA[]]></ST>
+      </Implementation>
+    </Action>
+  </POU>
+</TcPlcObject>

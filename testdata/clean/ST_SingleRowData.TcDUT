@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.12">
+  <DUT Name="ST_SingleRowData" Id="{a5a0f7f9-0738-4cb2-8da2-a227f06b0942}">
+    <Declaration><![CDATA[TYPE ST_SingleRowData :
+    STRUCT
+    udiCurrentRow             : UDINT;
+    lrXPosition               : LREAL;
+    lrYStartPosition          : LREAL;
+    lrYInveloPosition         : LREAL;
+    lrYTakePhotoPosition      : LREAL;
+    lrYStopPhotoPosition      : LREAL;
+    lrYEndCOnstantSpdPosition : LREAL;
+    lrYStopMovePosition       : LREAL;
+    END_STRUCT
+END_TYPE
+
+]]></Declaration>
+  </DUT>
+</TcPlcObject>

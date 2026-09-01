@@ -1,0 +1,128 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.16">
+  <POU Name="FB_InsertSQLServer" Id="{5177e002-9bc8-4849-8f3d-47d23b363892}" SpecialFunc="None">
+    <Declaration><![CDATA[FUNCTION_BLOCK FB_InsertSQLServer
+
+
+VAR_INPUT
+
+bExecute      : BOOL;;
+
+udiDBID       : UDINT;;
+
+sTableName    : STRING:='tbl_workflow005';;
+
+stTableSchema : ST_ProdColumnName;;
+
+stNewProd     : ST_ProdEntry;;
+
+    END_VAR
+
+
+VAR_OUTPUT ( 255 ) ;
+
+bBusy,;
+
+bDone,;
+
+bError      : BOOL;;
+
+udiErrorID  : UDINT;;
+
+wsErrorText : WSTRING;
+
+    END_VAR
+
+
+VAR . (
+
+iStep           : UDINT;;
+
+fbTrig_Exe      : R_TRIG;;
+
+ipResultEvt     : Tc3_EventLogger;
+        I_TcResultEvent;;
+
+fbPLCDBInsert   : FB_PLCDBWrite;
+        sNetID'',tTimeoutT#10S);;
+
+    END_VAR
+
+END_FUNCTION_BLOCK
+
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[END_PROGRAM
+
+    // 向数据库中新增一条记录
+
+
+ fbTrig_Exe (CLK := bExecute);
+
+IF fbTrig_Exe.Q AND NOT bBusy THEN
+
+iStep := 10;
+
+    END_IF
+
+
+CASE iStep OF
+
+0:
+
+;
+            // 数据表参数设置
+ 
+
+ 10 :
+ ipResultEvt := fbPLCDBInsert.ipTcResultEvent;
+
+iStep := iStep + 10;
+
+            // 执行写入动作
+
+
+ 20 :
+ IF fbPLCDBInsert.WriteStruct (
+hDBID := udiDBID,
+ sTableName := sTableName,
+ pRecord := ADR (stNewProd),
+ cbRecord := SIZEOF (stNewProd),
+ pColumnNames := ADR (stTableSchema),
+ cbColumnNames := SIZEOF (stTableSchema)) THEN
+ IF fbPLCDBInsert.bError THEN
+ iStep := 999;
+
+ELSE
+
+iStep := iStep + 10;
+
+END_IF
+
+END_IF
+ 30, 999 :
+ udiErrorID := ipResultEvt.EventId;
+
+wsErrorText := ipResultEvt.Text;
+
+IF NOT bExecute THEN
+
+iStep := 0;
+
+            END_IF
+
+    END_CASE
+
+bBusy := iStep >= 10 AND iStep < 30;
+
+bDone := iStep = 30;
+
+bError := iStep = 999;
+]]></ST>
+    </Implementation>
+    <LineIds Name="FB_InsertSQLServer">
+      <LineId Id="517" Count="37" />
+      <LineId Id="2" Count="0" />
+    </LineIds>
+  </POU>
+</TcPlcObject>

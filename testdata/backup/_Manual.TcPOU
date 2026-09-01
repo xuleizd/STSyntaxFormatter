@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.12">
+  <POU Name="_Manual" Id="{9f681777-c037-4e8c-a3f7-13f2f2e14d73}" SpecialFunc="None">
+    <Declaration><![CDATA[PROGRAM _Manual
+
+
+VAR
+
+fb_motion : FB_Motion;;
+
+mStep     : INT;;
+
+    END_VAR
+
+END_PROGRAM
+
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[END_PROGRAM
+
+    //手动定位
+
+
+    //bManual:=FALSE;
+ 
+
+    //bAuto:=FALSE;
+ 
+
+
+ IF Start THEN
+ fb_motion.bHaltX := FALSE;
+
+fb_motion.bHaltY := FALSE;
+
+fb_motion.bAbsX := TRUE;
+
+fb_motion.bAbsY := TRUE;
+
+fb_motion.mcMoveabsX.Position := AxisXPos;
+
+fb_motion.mcMoveabsY.Position := AxisYPos;
+
+END_IF
+
+
+ IF fb_motion.mcMoveabsX.Done AND fb_motion.mcMoveabsY.Done THEN
+ Start := FALSE;
+
+fb_motion.bAbsX := FALSE;
+
+fb_motion.bAbsY := FALSE;
+
+END_IF
+ IF Stop THEN
+ fb_motion.bHaltX := TRUE;
+
+fb_motion.bHaltY := TRUE;
+
+fb_motion.bAbsX := FALSE;
+
+fb_motion.bAbsY := FALSE;
+
+END_IF
+ IF NOT bAuto_Manual THEN
+ SysStep := 5;
+
+    //Stop:=FALSE;
+
+
+
+END_IF
+    //fb_motion();
+]]></ST>
+    </Implementation>
+  </POU>
+</TcPlcObject>

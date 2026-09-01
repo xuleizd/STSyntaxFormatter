@@ -1,0 +1,135 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4022.6">
+  <POU Name="ReadLastTrippedData" Id="{761a5fa0-76d3-472e-8198-18a37e249505}" SpecialFunc="None">
+    <Declaration><![CDATA[FUNCTION_BLOCK ReadLastTrippedData
+
+
+VAR_INPUT
+
+masterNetId : T_AmsNetId;;
+
+slaveAdr    : UINT;;
+
+enable      : BOOL;;
+
+    END_VAR
+
+
+VAR_OUTPUT
+
+lastTrippedData : LastTrippedData;;
+
+error           : BOOL;;
+
+    END_VAR
+
+
+VAR
+
+state   : UINT:=0;;
+
+readCoe : FB_EcCoeSdoReadEx;;
+
+timer   : TON;;
+
+    END_VAR
+
+END_FUNCTION_BLOCK
+
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[END_PROGRAM
+
+IF NOT enable THEN
+
+error := FALSE;
+
+    END_IF
+
+CASE state OF
+
+0:
+
+IF enable THEN
+
+timer.IN := TRUE;
+
+ELSE
+
+timer.IN := FALSE;
+
+            END_IF
+
+IF timer.Q THEN
+
+timer.IN := FALSE;
+
+readCoe.bExecute := TRUE;
+
+state := 1;
+
+            END_IF
+
+1:
+
+IF readCoe.bBusy THEN
+
+state := 2;
+
+readCoe.bExecute := FALSE;
+
+            END_IF
+
+2:
+
+IF NOT readCoe.bBusy THEN
+
+state := 0;
+
+            END_IF
+
+IF readCoe.bError THEN
+
+state := 0;
+
+            END_IF
+
+100:
+
+error := TRUE;
+
+IF NOT enable THEN
+
+state := 0;
+
+            END_IF
+
+    END_CASE
+
+
+timer (PT := updateTime);
+
+readCoe (sNetId := masterNetId,
+ nSlaveAddr := slaveAdr,
+ nIndex := 16#9002,
+ nSubIndex := 1,
+ pDstBuf := ADR (lastTrippedData),
+ cbBufLen := SIZEOF (lastTrippedData),
+ bCompleteAccess := TRUE);
+]]></ST>
+    </Implementation>
+    <LineIds Name="ReadLastTrippedData">
+      <LineId Id="80" Count="0" />
+      <LineId Id="82" Count="0" />
+      <LineId Id="79" Count="0" />
+      <LineId Id="40" Count="17" />
+      <LineId Id="66" Count="10" />
+      <LineId Id="37" Count="0" />
+      <LineId Id="98" Count="0" />
+      <LineId Id="38" Count="0" />
+      <LineId Id="9" Count="0" />
+      <LineId Id="32" Count="4" />
+      <LineId Id="99" Count="0" />
+    </LineIds>
+  </POU>
+</TcPlcObject>

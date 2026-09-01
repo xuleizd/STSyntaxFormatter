@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.15">
+  <DUT Name="ST_Integrated1" Id="{3ffa65e8-1aac-4b70-a4d0-81af0bb80f50}">
+    <Declaration><![CDATA[TYPE ST_Integrated1 :
+    STRUCT
+    bBool  : BOOL;
+    iData  : INT;
+    stInte : ST_Integrated2;
+    rData  : REAL;
+    sStr   : STRING;
+    END_STRUCT
+END_TYPE
+
+]]></Declaration>
+  </DUT>
+</TcPlcObject>

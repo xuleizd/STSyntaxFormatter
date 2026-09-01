@@ -1,0 +1,168 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.16">
+  <POU Name="FB_UpdateSQLServer" Id="{4181dffb-7ab5-4e70-adf5-481d32018c82}" SpecialFunc="None">
+    <Declaration><![CDATA[FUNCTION_BLOCK FB_UpdateSQLServer
+
+
+VAR_INPUT
+
+bExecute      : BOOL;;
+
+udiDBID       : UDINT;;
+
+sTableName    : STRING:='tbl_workflow005';;
+
+stTableSchema : ST_ProdColumnName;;
+
+stUpdateProd  : ST_ProdEntry;;
+
+    END_VAR
+
+
+VAR_OUTPUT ( 255 ) ;
+
+bBusy,;
+
+bDone,;
+
+bError      : BOOL;;
+
+udiErrorID  : UDINT;;
+
+wsErrorText : WSTRING;
+
+    END_VAR
+
+
+VAR . (
+
+iStep           : UDINT;;
+
+ipResultEvt     : Tc3_EventLogger;
+        I_TcResultEvent;;
+
+fbTrig_Exe      : R_TRIG;;
+
+fbSQLFormat     : FB_FormatString;;
+
+sTimeStamp      : STRING;;
+
+sSQLCmd         : T_MaxString;;
+
+fbPLCDBCmd      : FB_PLCDBCmd;
+        sNetID'',tTimeoutT#10S);;
+
+    END_VAR
+
+END_FUNCTION_BLOCK
+
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[END_PROGRAM
+
+fbTrig_Exe (CLK := bExecute);
+
+IF fbTrig_Exe.Q
+ AND NOT bBusy THEN
+
+iStep := 10;
+
+    END_IF
+
+
+CASE iStep OF
+
+0:
+
+;
+
+            // 准备更新参数
+ 
+
+ 10 :
+ ipResultEvt := fbPLCDBCmd.ipTcResultEvent;
+
+
+            // Updata 更新已有项数据内容
+
+
+            // Set item = xxx， 设置每一项的值
+ 
+
+            // where 筛选条件
+ 
+
+ sSQLCmd := 'UPDATE dbo.%s SET Timestamp = $27 %s $27, WC = %d, HG = %d WHERE CPID = %s';
+
+
+sTimeStamp := TO_STRING (stUpdateProd.Timestamp);
+
+sTimeStamp := DELETE (sTimeStamp, 4, 0);
+
+sTimeStamp [10] := 16#20;
+
+
+fbSQLFormat (
+sFormat := sSQLCmd,
+ arg1 := F_STRINGEx (sTableName),
+ arg2 := F_STRINGEx (sTimeStamp),
+ arg3 := F_UDINT (stUpdateProd.WC),
+ arg4 := F_UDINT (stUpdateProd.HG),
+ arg5 := F_STRINGEx (stUpdateProd.CPID),
+ arg7 :=,
+ sOut = > sSQLCmd);
+
+
+iStep := iStep + 10;
+
+
+            // 执行更新动作
+
+
+ 20 :
+ IF fbPLCDBCmd.Execute (
+hDBID := udiDBID,
+ pExpression := ADR (sSQLCmd),
+ cbExpression := SIZEOF (sSQLCmd),
+ pData := 0,
+ cbData := 0,
+ pParameter := 0,
+ cbParameter := 0) THEN
+
+ IF fbPLCDBCmd.bError THEN
+ iStep := 999;
+
+ELSE
+
+iStep := iStep + 10;
+
+END_IF
+
+END_IF
+
+ 30, 999 :
+ udiErrorID := ipResultEvt.EventId;
+
+wsErrorText := ipResultEvt.Text;
+
+IF NOT bExecute THEN
+
+iStep := 0;
+
+            END_IF
+
+    END_CASE
+
+bBusy := iStep >= 10 AND iStep < 30;
+
+bDone := iStep = 30;
+
+bError := iStep = 999;
+]]></ST>
+    </Implementation>
+    <LineIds Name="FB_UpdateSQLServer">
+      <LineId Id="3" Count="61" />
+      <LineId Id="2" Count="0" />
+    </LineIds>
+  </POU>
+</TcPlcObject>

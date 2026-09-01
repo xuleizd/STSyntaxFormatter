@@ -1,0 +1,132 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4022.6">
+  <POU Name="ReadCoeData" Id="{23141143-59de-4257-bed5-479cd268799d}" SpecialFunc="None">
+    <Declaration><![CDATA[FUNCTION_BLOCK ReadCoeData
+
+
+VAR_INPUT
+
+masterNetId : T_AmsNetId;;
+
+slaveAdr    : UINT;;
+
+index       : WORD;;
+
+subIndex    : BYTE:=1;;
+
+data        : POINTERTOBYTE;;
+
+length      : UINT;;
+
+enable      : BOOL;;
+
+    END_VAR
+
+
+VAR_OUTPUT
+
+error : BOOL;;
+
+    END_VAR
+
+
+VAR
+
+state   : UINT:=0;;
+
+readCoe : FB_EcCoeSdoReadEx;;
+
+timer   : TON;;
+
+    END_VAR
+
+END_FUNCTION_BLOCK
+
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[END_PROGRAM
+
+IF NOT enable THEN
+
+error := FALSE;
+
+    END_IF
+
+CASE state OF
+
+0:
+
+IF enable THEN
+
+timer.IN := TRUE;
+
+ELSE
+
+timer.IN := FALSE;
+
+            END_IF
+
+IF timer.Q THEN
+
+timer.IN := FALSE;
+
+readCoe.bExecute := TRUE;
+
+state := 1;
+
+            END_IF
+
+1:
+
+IF readCoe.bBusy THEN
+
+state := 2;
+
+readCoe.bExecute := FALSE;
+
+            END_IF
+
+2:
+
+IF NOT readCoe.bBusy THEN
+
+state := 0;
+
+            END_IF
+
+IF readCoe.bError THEN
+
+state := 0;
+
+            END_IF
+
+100:
+
+error := TRUE;
+
+IF NOT enable THEN
+
+state := 0;
+
+            END_IF
+
+    END_CASE
+
+
+timer (PT := updateTime);
+
+readCoe (sNetId := masterNetId,
+ nSlaveAddr := slaveAdr,
+ nIndex := index,
+ nSubIndex := subIndex,
+ pDstBuf := data,
+ cbBufLen := length,
+ bCompleteAccess := TRUE);
+]]></ST>
+    </Implementation>
+    <LineIds Name="ReadCoeData">
+      <LineId Id="22" Count="40" />
+      <LineId Id="9" Count="0" />
+    </LineIds>
+  </POU>
+</TcPlcObject>

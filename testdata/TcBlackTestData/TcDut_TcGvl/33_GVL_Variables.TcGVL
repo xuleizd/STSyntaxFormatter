@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.12">
+  <GVL Name="GVL_Variables" Id="{766d8d5b-91a3-46a8-ab61-270224db8376}">
+    <Declaration><![CDATA[VAR_GLOBAL
+    AxisN : AXIS_REF;
+    CamInOutX,CamOutOutX,CamInOutY,CamOutOutY:	ST_McOutputs;
+    safetySignal : BOOL;
+    //STOP			: 	BOOL;		//安全模块输出停
+    //mStart	: 	BOOL;
+    //mStop		:	BOOL;
+    SysStep : INT; //系统状态步
+    aStep : INT; //自动状态步
+    //ZPulseSignalX	AT%I* 	:BOOL;
+    //ZPulseSignalY	AT%I* 	:BOOL;
+    //ZPulseSignalZ	AT%I* 	:BOOL;
+    rAdvancedDonePos : LREAL;
+    bCamInX : BOOL;
+    bCamInY : BOOL;
+    bCamOutX : BOOL;
+    bCamOutY : BOOL;
+    bReadyX : BOOL;
+    bReadyY : BOOL;
+    //	bLimitHomeX:	BOOL;
+    //	bLimitHomeY:	BOOL;
+    //	bLimitHomeZ:	BOOL;
+    //	bPulseHomeX:	BOOL;
+    //	bPulseHomeY:	BOOL;
+    //	bPulseHomeZ:	BOOL;
+    //	bFinishHomeX:	BOOL;
+    //	bFinishHomeY:	BOOL;
+    //	bFinishHomeZ:	BOOL;
+    ton1 : ton;
+    sig : BOOL;
+END_VAR
+]]></Declaration>
+  </GVL>
+</TcPlcObject>

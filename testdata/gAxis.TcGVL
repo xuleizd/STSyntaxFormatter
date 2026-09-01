@@ -1,0 +1,309 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.12">
+  <GVL Name="gAxis" Id="{71322e6a-47d3-4b1f-8e59-e0b964e0719c}">
+    <Declaration><![CDATA[//{attribute 'qualified_only'}
+
+
+
+  VAR_GLOBAL CONSTANT
+//机台最大轴数，全部使用自然计数
+
+
+ iAxisMaxNum :
+
+
+INT := 4;
+
+
+//轴编号
+
+
+
+  AxisXNum :
+
+
+INT := 1;
+
+
+AxisYNum :
+
+
+INT := 2;
+
+
+AxisZNum :
+
+
+INT := 3;
+
+
+AxisMNum :
+
+
+INT := 4;
+
+
+// 轴的极限位置设置
+
+
+ lrAxisXLimitP :
+
+
+LREAL := 500;
+
+
+lrAxisXLimitN :
+
+
+LREAL := - 500;
+
+
+lrAxisYLimitP :
+
+
+LREAL := 500;
+
+
+lrAxisYLimitN :
+
+
+LREAL := - 500;
+
+
+END_VAR
+ VAR_GLOBAL
+(*————————————————————————————————————————————————轴控制————————————————————————————————————————————————*)
+// PLC轴对象
+
+
+ aAxis :
+
+
+ARRAY [1 .. iAxisMaxNum] OF AXIS_REF;
+
+
+// 轴控功能块声明
+
+
+
+  afbAxis :
+
+
+ARRAY [1 .. iAxisMaxNum] OF MC_AxisPos;
+
+
+// 连续检测使用
+
+
+
+  afbMovAbsContinuousDetection :
+
+
+ARRAY [1 .. 3] OF MC_MoveAbsolute;
+
+
+END_VAR
+ VAR_GLOBAL PERSISTENT
+ lrXHomeOffset,
+ lrYHomeOffset,
+ lrZHomeOffset :
+
+
+LREAL;
+
+
+lrZWorkingPos :
+
+
+LREAL;
+
+
+END_VAR
+ VAR_GLOBAL
+// AdvancedHoming
+
+
+ HomeStep :
+
+
+INT;
+
+
+//限位回零
+
+
+ mcStepLimitSwitchX,
+ mcStepLimitSwitchY,
+ mcStepLimitSwitchZ :
+
+
+MC_StepLimitSwitch;
+
+
+LimitSwitchSignalX,
+ LimitSwitchSignalY,
+ LimitSwitchSignalZ :
+
+
+MC_Ref_Signal_Ref;
+
+
+//Z向脉冲回零
+
+
+
+  mcStepReferenceX,
+ mcStepReferenceY,
+ mcStepReferenceZ :
+
+
+MC_StepReferencePulse;
+
+
+ReferencePulseSinalX,
+ ReferencePulseSinalY,
+ ReferencePulseSinalZ :
+
+
+MC_Ref_Signal_Ref;
+
+
+mcHomingParameter :
+
+
+MC_HomingParameter;
+
+
+//回零结束
+
+
+
+  mcFinishHomingX,
+ mcFinishHomingY,
+ mcFinishHomingZ :
+
+
+MC_FinishHoming;
+
+
+// 零点偏移
+
+
+
+  mcSetOffsetHomePosX,
+ mcSetOffsetHomePosY,
+ mcSetOffsetHomePosZ :
+
+
+MC_HomeDirect;
+
+
+// 功能块触发信号
+
+
+
+  bLimitHomeX :
+
+
+BOOL;
+
+
+bLimitHomeY :
+
+
+BOOL;
+
+
+bLimitHomeZ :
+
+
+BOOL;
+
+
+bFinishHomeX :
+
+
+BOOL;
+
+
+bFinishHomeY :
+
+
+BOOL;
+
+
+bFinishHomeZ :
+
+
+BOOL;
+
+
+bOffsetHomeX :
+
+
+BOOL;
+
+
+bOffsetHomeY :
+
+
+BOOL;
+
+
+bOffsetHomeZ :
+
+
+BOOL;
+
+
+bPulseHomeX :
+
+
+BOOL;
+
+
+bPulseHomeY :
+
+
+BOOL;
+
+
+bPulseHomeZ :
+
+
+BOOL;
+
+
+// 功能块完成标志
+
+
+
+  mcStepLimitSwitchDone :
+
+
+BOOL;
+
+
+mcStepReferenceDone :
+
+
+BOOL;
+
+
+mcFinishHomingDone :
+
+
+BOOL;
+
+
+bOffsetHomeDone :
+
+
+BOOL;
+
+
+END_VAR
+
+]]></Declaration>
+  </GVL>
+</TcPlcObject>

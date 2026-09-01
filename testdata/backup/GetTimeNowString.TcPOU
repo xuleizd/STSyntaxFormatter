@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4022.6">
+  <POU Name="GetTimeNowString" Id="{69b8058d-ee57-4098-a211-7563fab33130}" SpecialFunc="None">
+    <Declaration><![CDATA[FUNCTION_BLOCK GetTimeNowString
+
+
+VAR_INPUT
+
+enable : BOOL;;
+
+    END_VAR
+
+
+VAR_OUTPUT
+
+timeString : T_MaxString:='Not available';;
+
+    END_VAR
+
+
+VAR
+
+getTime : NT_GetTime;;
+
+format  : FB_FormatString;;
+
+state   : INT;;
+
+    END_VAR
+
+END_FUNCTION_BLOCK
+
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[END_PROGRAM
+
+getTime (netId := localNetId);
+
+
+CASE state OF
+
+0:
+
+IF enable THEN
+
+state := 1;
+
+getTime.START := TRUE;
+
+getTime ();
+
+            END_IF
+
+1:
+
+IF NOT getTime.BUSY THEN
+
+getTime.START := FALSE;
+
+state := 2;
+
+format (
+sFormat := '%4d-%.2d-%.2d  %.2d:%.2d',
+ arg1 := F_WORD (getTime.TIMESTR.wYear),
+ arg2 := F_WORD (getTime.TIMESTR.wMonth),
+ arg3 := F_WORD (getTime.TIMESTR.wDay),
+ arg4 := F_WORD (getTime.TIMESTR.wHour),
+ arg5 := F_WORD (getTime.TIMESTR.wMinute),
+ sOut = > timeString);
+
+            END_IF
+
+2:
+
+IF NOT enable THEN
+
+state := 0;
+
+            END_IF
+
+    END_CASE
+]]></ST>
+    </Implementation>
+    <LineIds Name="GetTimeNowString">
+      <LineId Id="40" Count="0" />
+      <LineId Id="42" Count="0" />
+      <LineId Id="9" Count="0" />
+      <LineId Id="15" Count="0" />
+      <LineId Id="17" Count="1" />
+      <LineId Id="34" Count="0" />
+      <LineId Id="63" Count="0" />
+      <LineId Id="19" Count="0" />
+      <LineId Id="21" Count="1" />
+      <LineId Id="36" Count="0" />
+      <LineId Id="23" Count="0" />
+      <LineId Id="28" Count="0" />
+      <LineId Id="58" Count="0" />
+      <LineId Id="56" Count="1" />
+      <LineId Id="59" Count="3" />
+      <LineId Id="24" Count="1" />
+      <LineId Id="27" Count="0" />
+      <LineId Id="30" Count="1" />
+      <LineId Id="16" Count="0" />
+      <LineId Id="37" Count="0" />
+    </LineIds>
+  </POU>
+</TcPlcObject>

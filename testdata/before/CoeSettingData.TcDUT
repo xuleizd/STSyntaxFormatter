@@ -1,0 +1,15 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4022.6">
+  <DUT Name="CoeSettingData" Id="{a6982e9d-435b-4ac7-8f97-4ccbe30aa532}">
+    <Declaration><![CDATA[TYPE CoeSettingData :
+STRUCT
+	index: UINT;
+	subIndex: BYTE;
+	settingData: POINTER TO INT;
+	settingDataLength: UINT;
+	settingLength:UINT;
+END_STRUCT
+END_TYPE
+]]></Declaration>
+  </DUT>
+</TcPlcObject>

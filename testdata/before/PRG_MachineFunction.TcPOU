@@ -1,0 +1,851 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.13">
+  <POU Name="PRG_MachineFunction" Id="{803dbe67-0805-4399-918c-6028222bba73}" SpecialFunc="None">
+    <Declaration><![CDATA[PROGRAM PRG_MachineFunction
+
+
+VAR
+
+    END_VAR
+
+END_PROGRAM
+
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[END_PROGRAM
+
+
+
+
+    // 安全逻辑
+
+
+ _Safety ();
+
+
+    // 掉电保持数据
+
+
+ Act_PersistentData ();
+
+
+    // 检查视场输入信息
+
+
+ Act_ViewInfoCheck ();
+
+
+    // 检查目标区域输入信息
+
+
+ Act_TargetAreaInfoCheck ();
+
+
+    // 计算目标区域的扫描计划
+
+
+ Act_GetProcessPlan ();
+
+
+    // 单行的动作轨迹计算
+
+
+ Act_CalcNextRowData ();
+
+
+    // 至开始位置准备
+
+
+ Act_GoToStartPreparePosition ();
+
+
+    // 单行的动作控制
+
+
+ Act_SingleRowFlowControl ();
+]]></ST>
+    </Implementation>
+    <Action Name="Act_CalcNextRowData" Id="{b356a76d-06ee-48bc-a4d4-d76633bf7314}">
+      <Implementation>
+        <ST><![CDATA[END_PROGRAM
+
+bCalcSingleRowOK := TRUE;
+
+IF bViewDatasetOKInUse
+ AND bTargetAreaDatasetOKInUse THEN
+
+
+IF stProcessingDataInuse.udiCurrentRow >= 0
+ AND stProcessingDataInuse.udiCurrentRow <= stProcessingDataInuse.udiTotalRows THEN
+
+            // 偶数行
+
+
+ IF (stProcessingDataInuse.udiCurrentRow MOD 2) = 0 THEN
+ stTargetRowData.lrXPosition := stProcessingDataInuse.lrColFirstRowPosition + stProcessingDataInuse.lrColGapOfEachRow * stProcessingDataInuse.udiCurrentRow;
+
+stTargetRowData.lrYStartPosition := stProcessingDataInuse.lrEvenRowStartPosition;
+
+stTargetRowData.lrYInveloPosition := stProcessingDataInuse.lrEvenRowInVeloPosition;
+
+stTargetRowData.lrYTakePhotoPosition := stProcessingDataInuse.lrEvenRowTakePhotoPosition;
+
+stTargetRowData.lrYStopPhotoPosition := stProcessingDataInuse.lrEvenRowStopPhotoPosition;
+
+stTargetRowData.lrYEndCOnstantSpdPosition := stProcessingDataInuse.lrEvenRowEndConstantSpdPosition;
+
+stTargetRowData.lrYStopMovePosition := stProcessingDataInuse.lrEvenRowStopMovePosition;
+
+            // 奇数行
+
+
+ ELSIF (stProcessingDataInuse.udiCurrentRow MOD 2) = 1 THEN
+ stTargetRowData.lrXPosition := stProcessingDataInuse.lrColFirstRowPosition + stProcessingDataInuse.lrColGapOfEachRow * stProcessingDataInuse.udiCurrentRow;
+
+stTargetRowData.lrYStartPosition := stProcessingDataInuse.lrOddRowStartPosition;
+
+stTargetRowData.lrYInveloPosition := stProcessingDataInuse.lrOddRowInVeloPosition;
+
+stTargetRowData.lrYTakePhotoPosition := stProcessingDataInuse.lrOddRowTakePhotoPosition;
+
+stTargetRowData.lrYStopPhotoPosition := stProcessingDataInuse.lrOddRowStopPhotoPosition;
+
+stTargetRowData.lrYEndCOnstantSpdPosition := stProcessingDataInuse.lrOddRowEndConstantSpdPosition;
+
+stTargetRowData.lrYStopMovePosition := stProcessingDataInuse.lrOddRowStopMovePosition;
+
+        END_IF
+
+ELSE
+
+bCalcSingleRowOK := FALSE;
+
+    END_IF
+
+
+ELSE
+ bCalcSingleRowOK := FALSE;
+
+END_IF
+]]></ST>
+      </Implementation>
+    </Action>
+    <Action Name="Act_GetProcessPlan" Id="{17eebbdb-2bbe-4987-a36f-3527f631b4c4}">
+      <Implementation>
+        <ST><![CDATA[END_PROGRAM
+
+gHMI.bProcessingDatasetOK := TRUE;
+
+gHMI.wsProcessingDiag := " 参数OK";
+
+
+IF gHMI.stProcessingDatasets.lrColFirstRowRedundancy > 50 THEN
+
+gHMI.bProcessingDatasetOK := FALSE;
+
+gHMI.wsProcessingDiag := " 首行提前量应小于50%";
+
+ELSIF gHMI.stProcessingDatasets.lrColRowOverlap > 50 THEN
+
+gHMI.bProcessingDatasetOK := FALSE;
+
+gHMI.wsProcessingDiag := " 前后行重叠量应小于50%";
+
+    END_IF
+
+
+IF gHMI.stProcessingDatasets.lrRowTriggerTakePhotoDis <= 0
+ OR gHMI.lrTargetAreaCentralPointY - gHMI.stProcessingDatasets.lrRowTriggerTakePhotoDis < gAxis.lrAxisYLimitN
+ OR gHMI.lrTargetAreaCentralPointY + gHMI.stProcessingDatasets.lrRowTriggerTakePhotoDis > gAxis.lrAxisYLimitP THEN
+
+gHMI.bProcessingDatasetOK := FALSE;
+
+gHMI.wsProcessingDiag := " 拍照触发距离应大于0、小于极限范围";
+
+ELSIF gHMI.stProcessingDatasets.lrRowInVeloPositionDis <= 0
+ OR gHMI.stProcessingDatasets.lrRowInVeloPositionDis < gHMI.stProcessingDatasets.lrRowTriggerTakePhotoDis
+ OR gHMI.lrTargetAreaCentralPointY - gHMI.stProcessingDatasets.lrRowInVeloPositionDis < gAxis.lrAxisYLimitN
+ OR gHMI.lrTargetAreaCentralPointY + gHMI.stProcessingDatasets.lrRowInVeloPositionDis > gAxis.lrAxisYLimitP THEN
+
+gHMI.bProcessingDatasetOK := FALSE;
+
+gHMI.wsProcessingDiag := " 到达匀速状态距离应大于0、大于拍照触发距离、小于极限范围";
+
+ELSIF gHMI.stProcessingDatasets.lrRowStartPositionDis <= 0
+ OR gHMI.stProcessingDatasets.lrRowStartPositionDis < gHMI.stProcessingDatasets.lrRowInVeloPositionDis
+ OR gHMI.lrTargetAreaCentralPointY - gHMI.stProcessingDatasets.lrRowStartPositionDis < gAxis.lrAxisYLimitN
+ OR gHMI.lrTargetAreaCentralPointY + gHMI.stProcessingDatasets.lrRowStartPositionDis > gAxis.lrAxisYLimitP THEN
+
+gHMI.bProcessingDatasetOK := FALSE;
+
+gHMI.wsProcessingDiag := " 开始点距离应大于0、大于到达均速状态距离、小于极限范围";
+
+    END_IF
+
+
+IF gHMI.stProcessingDatasets.lrRowTriggerStopPhotoDis <= 0
+ OR gHMI.lrTargetAreaCentralPointY - gHMI.stProcessingDatasets.lrRowTriggerStopPhotoDis < gAxis.lrAxisYLimitN
+ OR gHMI.lrTargetAreaCentralPointY + gHMI.stProcessingDatasets.lrRowTriggerStopPhotoDis > gAxis.lrAxisYLimitP THEN
+
+gHMI.bProcessingDatasetOK := FALSE;
+
+gHMI.wsProcessingDiag := " 结束拍照位置应大于0、小于极限范围";
+
+ELSIF gHMI.stProcessingDatasets.lrRowEndConstantSpdDis <= 0
+ OR gHMI.stProcessingDatasets.lrRowEndConstantSpdDis < gHMI.stProcessingDatasets.lrRowTriggerStopPhotoDis
+ OR gHMI.lrTargetAreaCentralPointY - gHMI.stProcessingDatasets.lrRowEndConstantSpdDis < gAxis.lrAxisYLimitN
+ OR gHMI.lrTargetAreaCentralPointY + gHMI.stProcessingDatasets.lrRowEndConstantSpdDis > gAxis.lrAxisYLimitP THEN
+
+gHMI.bProcessingDatasetOK := FALSE;
+
+gHMI.wsProcessingDiag := " 结束匀速距离应大于0、大于结束拍照位置、小于极限范围";
+
+ELSIF gHMI.stProcessingDatasets.lrRowStopMoveDis <= 0
+ OR gHMI.stProcessingDatasets.lrRowStopMoveDis < gHMI.stProcessingDatasets.lrRowEndConstantSpdDis
+ OR gHMI.lrTargetAreaCentralPointY - gHMI.stProcessingDatasets.lrRowStopMoveDis < gAxis.lrAxisYLimitN
+ OR gHMI.lrTargetAreaCentralPointY + gHMI.stProcessingDatasets.lrRowStopMoveDis > gAxis.lrAxisYLimitP THEN
+
+gHMI.bProcessingDatasetOK := FALSE;
+
+gHMI.wsProcessingDiag := " 停止距离应大于0、结束匀速状态位置、小于极限范围";
+
+    END_IF
+
+
+    // 实时输出根据设定参数计算出来的加工情况
+
+
+ IF gHMI.bViewDatasetOK
+ AND gHMI.bTargetAreaDatasetOK
+ AND gHMI.bProcessingDatasetOK THEN
+ stProcessingDataRealtime.lrColFirstRowPosition := gHMI.lrTargetAreaCentralPointX - gHMI.lrTargetAreaHeight / 2 - gHMI.lrViewHeight * (1 - gHMI.stProcessingDatasets.lrColFirstRowRedundancy * 0.01);
+
+
+stProcessingDataRealtime.lrColGapOfEachRow := gHMI.lrViewHeight * (1 - gHMI.stProcessingDatasets.lrColRowOverlap * 0.01);
+
+
+stProcessingDataRealtime.udiTotalRows := TO_UDINT (FPU.Ceil ((gHMI.lrViewHeight * (gHMI.stProcessingDatasets.lrColFirstRowRedundancy * 0.01) + gHMI.lrTargetAreaHeight) / (gHMI.lrViewHeight * (1 - gHMI.stProcessingDatasets.lrColRowOverlap * 0.01))));
+
+
+    // 偶数行位置
+
+
+ stProcessingDataRealtime.lrEvenRowTakePhotoPosition := gHMI.lrTargetAreaCentralPointY - gHMI.lrTargetAreaWidth / 2 - gHMI.stProcessingDatasets.lrRowTriggerTakePhotoDis;
+
+
+stProcessingDataRealtime.lrEvenRowInVeloPosition := gHMI.lrTargetAreaCentralPointY - gHMI.lrTargetAreaWidth / 2 - gHMI.stProcessingDatasets.lrRowInVeloPositionDis;
+
+
+stProcessingDataRealtime.lrEvenRowStartPosition := gHMI.lrTargetAreaCentralPointY - gHMI.lrTargetAreaWidth / 2 - gHMI.stProcessingDatasets.lrRowStartPositionDis;
+
+
+stProcessingDataRealtime.lrEvenRowStopPhotoPosition := gHMI.lrTargetAreaCentralPointY + gHMI.lrTargetAreaWidth / 2 + gHMI.stProcessingDatasets.lrRowTriggerStopPhotoDis;
+
+
+stProcessingDataRealtime.lrEvenRowEndConstantSpdPosition := gHMI.lrTargetAreaCentralPointY + gHMI.lrTargetAreaWidth / 2 + gHMI.stProcessingDatasets.lrRowEndConstantSpdDis;
+
+
+stProcessingDataRealtime.lrEvenRowStopMovePosition := gHMI.lrTargetAreaCentralPointY + gHMI.lrTargetAreaWidth / 2 + gHMI.stProcessingDatasets.lrRowStopMoveDis;
+
+
+    // 奇数行位置
+
+
+ stProcessingDataRealtime.lrOddRowTakePhotoPosition := gHMI.lrTargetAreaCentralPointY + gHMI.lrTargetAreaWidth / 2 + gHMI.stProcessingDatasets.lrRowTriggerTakePhotoDis;
+
+
+stProcessingDataRealtime.lrOddRowInVeloPosition := gHMI.lrTargetAreaCentralPointY + gHMI.lrTargetAreaWidth / 2 + gHMI.stProcessingDatasets.lrRowInVeloPositionDis;
+
+
+stProcessingDataRealtime.lrOddRowStartPosition := gHMI.lrTargetAreaCentralPointY + gHMI.lrTargetAreaWidth / 2 + gHMI.stProcessingDatasets.lrRowStartPositionDis;
+
+
+stProcessingDataRealtime.lrOddRowStopPhotoPosition := gHMI.lrTargetAreaCentralPointY - gHMI.lrTargetAreaWidth / 2 - gHMI.stProcessingDatasets.lrRowTriggerStopPhotoDis;
+
+
+stProcessingDataRealtime.lrOddRowEndConstantSpdPosition := gHMI.lrTargetAreaCentralPointY - gHMI.lrTargetAreaWidth / 2 - gHMI.stProcessingDatasets.lrRowEndConstantSpdDis;
+
+
+stProcessingDataRealtime.lrOddRowStopMovePosition := gHMI.lrTargetAreaCentralPointY - gHMI.lrTargetAreaWidth / 2 - gHMI.stProcessingDatasets.lrRowStopMoveDis;
+
+
+END_IF
+]]></ST>
+      </Implementation>
+    </Action>
+    <Action Name="Act_GoToStartPreparePosition" Id="{0b009173-cc96-48b8-9d85-dfb66fe1ab63}">
+      <Implementation>
+        <ST><![CDATA[END_PROGRAM
+
+CASE iStepGoPrepaingPos OF
+
+0:
+
+IF bTriggerGoPreparingPos THEN
+
+bTriggerGoPreparingPos := FALSE;
+
+iStepGoPrepaingPos := iStepGoPrepaingPos + 10;
+
+            END_IF
+
+
+            // Z轴回零
+
+
+ 10 :
+ afbAxis [AxisZNum].M_MovAbs (FALSE);
+
+afbAxis [AxisZNum].lrMovAbsPos := 0;
+
+afbAxis [AxisZNum].lrMovAbsVelo := lrProcessingVeloZInuse;
+
+afbAxis [AxisZNum].M_MovAbs (TRUE);
+
+iStepGoPrepaingPos := iStepGoPrepaingPos + 10;
+
+
+20:
+
+IF NOT afbAxis [AxisZNum].bMovAbsBusy THEN
+
+IF afbAxis [AxisZNum].bMovAbsDone THEN
+
+iStepGoPrepaingPos := iStepGoPrepaingPos + 10;
+
+ELSE
+
+iStepGoPrepaingPos := 999;
+
+                END_IF
+
+afbAxis [AxisZNum].M_MovAbs (FALSE);
+
+            END_IF
+
+
+            // XY轴同动到开始位置
+
+
+ 30 :
+ afbAxis [AxisXNum].M_MovAbs (FALSE);
+
+afbAxis [AxisXNum].lrMovAbsPos := stTargetRowData.lrXPosition;
+
+afbAxis [AxisXNum].lrMovAbsVelo := lrProcessingVeloXInuse;
+
+afbAxis [AxisXNum].M_MovAbs (TRUE);
+
+
+afbAxis [AxisYNum].M_MovAbs (FALSE);
+
+afbAxis [AxisYNum].lrMovAbsPos := stTargetRowData.lrYStartPosition;
+
+afbAxis [AxisYNum].lrMovAbsVelo := lrProcessingVeloYInuse;
+
+afbAxis [AxisYNum].M_MovAbs (TRUE);
+
+iStepGoPrepaingPos := iStepGoPrepaingPos + 10;
+
+
+40:
+
+IF NOT afbAxis [AxisXNum].bMovAbsBusy
+ AND NOT afbAxis [AxisYNum].bMovAbsBusy THEN
+
+IF afbAxis [AxisXNum].bMovAbsDone
+ AND afbAxis [AxisYNum].bMovAbsDone THEN
+
+iStepGoPrepaingPos := iStepGoPrepaingPos + 10;
+
+ELSE
+
+iStepGoPrepaingPos := 999;
+
+                END_IF
+
+afbAxis [AxisXNum].M_MovAbs (FALSE);
+
+afbAxis [AxisYNum].M_MovAbs (FALSE);
+
+            END_IF
+
+
+            // Z轴到加工位
+
+
+ 50 :
+ afbAxis [AxisZNum].M_MovAbs (FALSE);
+
+afbAxis [AxisZNum].lrMovAbsPos := lrZWorkingPos;
+
+afbAxis [AxisZNum].lrMovAbsVelo := lrProcessingVeloZInuse;
+
+afbAxis [AxisZNum].M_MovAbs (TRUE);
+
+iStepGoPrepaingPos := iStepGoPrepaingPos + 10;
+
+
+60:
+
+IF NOT afbAxis [AxisZNum].bMovAbsBusy THEN
+
+IF afbAxis [AxisZNum].bMovAbsDone THEN
+
+iStepGoPrepaingPos := iStepGoPrepaingPos + 10;
+
+ELSE
+
+iStepGoPrepaingPos := 999;
+
+                END_IF
+
+afbAxis [AxisZNum].M_MovAbs (FALSE);
+
+            END_IF
+
+
+70:
+
+bFirstRowArrived := TRUE;
+
+IF NOT bTriggerGoPreparingPos THEN
+
+iStepGoPrepaingPos := 0;
+
+            END_IF
+
+
+999:
+
+bFirstRowArrived := FALSE;
+
+gMachine.eMachineState := E_MachineState._ABORTING;
+
+    END_CASE
+]]></ST>
+      </Implementation>
+    </Action>
+    <Action Name="Act_PersistentData" Id="{bc3ed417-1d27-4461-9e25-8096d0cab861}">
+      <Implementation>
+        <ST><![CDATA[END_PROGRAM
+
+gMachine.fbWritePersistent (
+NETID :=,
+ PORT :=,
+ START :=,
+ TMOUT :=,
+ MODE :=,
+ BUSY = >,
+ ERR = >,
+ ERRID = >);
+]]></ST>
+      </Implementation>
+    </Action>
+    <Action Name="Act_SingleRowFlowControl" Id="{91ed64cd-c1d6-4769-b069-b43793ab2543}">
+      <Implementation>
+        <ST><![CDATA[END_PROGRAM
+
+CASE iStepSingleRowProcess OF
+
+0:
+
+IF bTriggerStartSingleRow
+ AND NOT stProcessingDataInuse.bPaused THEN
+
+bTriggerStartSingleRow := FALSE;
+
+iStepSingleRowProcess := iStepSingleRowProcess + 10;
+
+            END_IF
+
+
+            // 调整Z向到达工作位置
+
+
+ 10 :
+ afbAxis [AxisZNum].M_MovAbs (FALSE);
+
+afbAxis [AxisZNum].lrMovAbsPos := lrZWorkingPos;
+
+afbAxis [AxisZNum].lrMovAbsVelo := lrProcessingVeloZInuse;
+
+afbAxis [AxisZNum].M_MovAbs (TRUE);
+
+iStepSingleRowProcess := iStepSingleRowProcess + 10;
+
+
+20:
+
+IF NOT afbAxis [AxisZNum].bMovAbsBusy THEN
+
+IF afbAxis [AxisZNum].bMovAbsDone THEN
+
+iStepSingleRowProcess := iStepSingleRowProcess + 10;
+
+ELSE
+
+iStepSingleRowProcess := 999;
+
+                END_IF
+
+afbAxis [AxisZNum].M_MovAbs (FALSE);
+
+            END_IF
+
+
+            // 到达预设X方向
+
+
+            // 到达预设Y开始点
+ 
+
+ 30 :
+ afbAxis [AxisXNum].M_MovAbs (FALSE);
+
+afbAxis [AxisXNum].lrMovAbsPos := stTargetRowData.lrXPosition;
+
+afbAxis [AxisXNum].lrMovAbsVelo := lrProcessingVeloXInuse;
+
+afbAxis [AxisXNum].M_MovAbs (TRUE);
+
+
+afbAxis [AxisYNum].M_MovAbs (FALSE);
+
+afbAxis [AxisYNum].lrMovAbsPos := stTargetRowData.lrYStartPosition;
+
+afbAxis [AxisYNum].lrMovAbsVelo := lrProcessingVeloYInuse;
+
+afbAxis [AxisYNum].M_MovAbs (TRUE);
+
+iStepSingleRowProcess := iStepSingleRowProcess + 10;
+
+
+40:
+
+IF NOT afbAxis [AxisXNum].bMovAbsBusy
+ AND NOT afbAxis [AxisYNum].bMovAbsBusy THEN
+
+IF afbAxis [AxisXNum].bMovAbsDone
+ AND afbAxis [AxisYNum].bMovAbsDone THEN
+
+iStepSingleRowProcess := iStepSingleRowProcess + 10;
+
+ELSE
+
+iStepSingleRowProcess := 999;
+
+                END_IF
+
+afbAxis [AxisXNum].M_MovAbs (FALSE);
+
+afbAxis [AxisYNum].M_MovAbs (FALSE);
+
+            END_IF
+
+
+50:
+
+afbMovAbsContinuousDetection [1] (Axis := aAxis [AxisYNum], Execute := FALSE,);
+
+afbMovAbsContinuousDetection [2] (Axis := aAxis [AxisYNum], Execute := FALSE,);
+
+afbMovAbsContinuousDetection [3] (Axis := aAxis [AxisYNum], Execute := FALSE,);
+
+iStepSingleRowProcess := iStepSingleRowProcess + 10;
+
+
+            // 启动绝对定位1至InVelocityPosition，buffermode=Aborting
+
+
+ 60 :
+ afbMovAbsContinuousDetection [1].Position := stTargetRowData.lrYInveloPosition;
+
+afbMovAbsContinuousDetection [1].Velocity := lrProcessingVeloYInuse;
+
+afbMovAbsContinuousDetection [1].Execute := TRUE;
+
+iStepSingleRowProcess := iStepSingleRowProcess + 10;
+
+
+70:
+
+            // 定位1Active后，启动绝对定位2至EndInVelocityPosition，BufferMode=BlendNext
+
+
+ IF afbMovAbsContinuousDetection [1].Active THEN
+ afbMovAbsContinuousDetection [2].Position := stTargetRowData.lrYEndCOnstantSpdPosition;
+
+afbMovAbsContinuousDetection [2].Velocity := lrProcessingVeloYInuse;
+
+afbMovAbsContinuousDetection [2].Execute := TRUE;
+
+END_IF
+
+ IF NOT afbMovAbsContinuousDetection [1].Busy THEN
+ IF afbMovAbsContinuousDetection [1].Done THEN
+ iStepSingleRowProcess := iStepSingleRowProcess + 10;
+
+ELSE
+
+iStepSingleRowProcess := 999;
+
+END_IF
+
+END_IF
+
+ 80 :
+            // 定位2Active后，启动绝对定位3至StopPosition，BUfferMode=BlendPrevious
+ 
+
+ IF afbMovAbsContinuousDetection [2].Active THEN
+ afbMovAbsContinuousDetection [3].Position := stTargetRowData.lrYStopMovePosition;
+
+afbMovAbsContinuousDetection [3].Velocity := lrProcessingVeloYInuse;
+
+afbMovAbsContinuousDetection [3].Execute := TRUE;
+
+END_IF
+
+ IF NOT afbMovAbsContinuousDetection [2].Busy THEN
+ IF afbMovAbsContinuousDetection [2].Done THEN
+ iStepSingleRowProcess := iStepSingleRowProcess + 10;
+
+ELSE
+ iStepSingleRowProcess := 999;
+
+END_IF
+
+END_IF
+
+ 90 :
+ IF NOT afbMovAbsContinuousDetection [3].Busy THEN
+ IF afbMovAbsContinuousDetection [3].Done THEN
+ iStepSingleRowProcess := iStepSingleRowProcess + 10;
+
+stProcessingDataInuse.udiCurrentRow := stProcessingDataInuse.udiCurrentRow + 1;
+
+ELSE
+ iStepSingleRowProcess := 999;
+
+END_IF
+
+END_IF
+
+            // 完成
+ 
+
+ 100 :
+ IF stProcessingDataInuse.udiCurrentRow > stProcessingDataInuse.udiTotalRows THEN
+ bTriggerStartSingleRow := FALSE;
+
+stProcessingDataInuse.bDone := TRUE;
+
+ELSE
+ bTriggerStartSingleRow := NOT stProcessingDataInuse.bPaused AND gMachine.eMachineState = E_MachineState._EXECUTE;
+
+END_IF
+ iStepSingleRowProcess := 0;
+
+
+999 :
+ iStepSingleRowProcess := 0;
+
+gMachine.eMachineState := E_MachineState._ABORTING;
+
+    END_CASE
+
+
+
+afbMovAbsContinuousDetection [1] (Axis := aAxis [AxisYNum], BufferMode := MC_BufferMode.MC_Aborting);
+
+afbMovAbsContinuousDetection [2] (Axis := aAxis [AxisYNum], BufferMode := MC_BufferMode.MC_BlendingNext);
+
+afbMovAbsContinuousDetection [3] (Axis := aAxis [AxisYNum], BufferMode := MC_BufferMode.MC_BlendingPrevious);
+
+
+
+    // 单行信号反馈
+
+
+ IF (stProcessingDataInuse.udiCurrentRow MOD 2) = 0 THEN
+    // 位置大于SignalStart触发输出
+ 
+
+ bStartPhotoSignal := (afbAxis [AxisYNum].lrActPosition >= stTargetRowData.lrYTakePhotoPosition) AND gMachine.eMachineState = E_MachineState._EXECUTE;
+
+    // 位置大于SignalStop触发输出
+
+
+ bStopPhotoSignal := (afbAxis [AxisYNum].lrActPosition >= stTargetRowData.lrYStopPhotoPosition) AND gMachine.eMachineState = E_MachineState._EXECUTE;
+
+ELSE
+    // 位置小于SignalStart触发输出
+ 
+
+ bStartPhotoSignal := (afbAxis [AxisYNum].lrActPosition <= stTargetRowData.lrYTakePhotoPosition) AND gMachine.eMachineState = E_MachineState._EXECUTE;
+
+    // 位置小于SignalStop触发输出
+
+
+ bStopPhotoSignal := (afbAxis [AxisYNum].lrActPosition <= stTargetRowData.lrYStopPhotoPosition) AND gMachine.eMachineState = E_MachineState._EXECUTE;
+
+END_IF
+
+    // 加工状态反馈
+ 
+
+ bProcessingState := iStepSingleRowProcess >= 10 AND iStepSingleRowProcess < 100;
+
+IF stProcessingDataInuse.udiTotalRows <> 0 THEN
+
+stProcessingDataInuse.lrCompletePercentage := 100 * stProcessingDataInuse.udiCurrentRow / stProcessingDataInuse.udiTotalRows;
+
+    END_IF
+]]></ST>
+      </Implementation>
+    </Action>
+    <Action Name="Act_TargetAreaInfoCheck" Id="{aa21c957-83ce-48ae-85ec-3c055e05c1ee}">
+      <Implementation>
+        <ST><![CDATA[END_PROGRAM
+
+gHMI.bTargetAreaDatasetOK := TRUE;
+
+gHMI.wsTargetAreaDiag := " 参数OK";
+
+IF gHMI.lrTargetAreaWidth > gAxis.lrAxisXLimitP - gAxis.lrAxisXLimitN
+ OR gHMI.lrTargetAreaWidth <= 0 THEN
+
+gHMI.bTargetAreaDatasetOK := FALSE;
+
+gHMI.wsTargetAreaDiag := " 目标区域大于X轴移动范围、小于0";
+
+ELSIF gHMI.lrTargetAreaHeight > gAxis.lrAxisYLimitP - gAxis.lrAxisYLimitN
+ OR gHMI.lrTargetAreaHeight <= 0 THEN
+
+gHMI.bTargetAreaDatasetOK := FALSE;
+
+gHMI.wsTargetAreaDiag := " 目标区域大于Y轴移动范围、小于0";
+
+ELSIF gHMI.lrTargetAreaWidth / 2 + gHMI.lrTargetAreaCentralPointX > gAxis.lrAxisXLimitP
+ OR gHMI.lrTargetAreaCentralPointX - gHMI.lrTargetAreaWidth / 2 < gAxis.lrAxisXLimitN THEN
+
+gHMI.bTargetAreaDatasetOK := FALSE;
+
+gHMI.wsTargetAreaDiag := " 目标区域中心点X坐标大于轴移动范围";
+
+ELSIF gHMI.lrTargetAreaHeight / 2 + gHMI.lrTargetAreaCentralPointY > gAxis.lrAxisYLimitP
+ OR gHMI.lrTargetAreaCentralPointY - gHMI.lrTargetAreaHeight / 2 < gAxis.lrAxisYLimitN THEN
+
+gHMI.bTargetAreaDatasetOK := FALSE;
+
+gHMI.wsTargetAreaDiag := " 目标区域中心点Y坐标大于轴移动范围";
+
+    END_IF
+
+
+
+    // 加工中的数据检查
+
+
+ bTargetAreaDatasetOKInUse := TRUE;
+
+IF lrTargetAreaWidthInUse > gAxis.lrAxisXLimitP - gAxis.lrAxisXLimitN
+ OR lrTargetAreaWidthInUse <= 0 THEN
+
+bTargetAreaDatasetOKInUse := FALSE;
+
+ELSIF lrTargetAreaHeightInUse > gAxis.lrAxisYLimitP - gAxis.lrAxisYLimitN
+ OR lrTargetAreaHeightInUse <= 0 THEN
+
+bTargetAreaDatasetOKInUse := FALSE;
+
+ELSIF lrTargetAreaWidthInUse / 2 + lrTargetAreaCentralPointXInUse > gAxis.lrAxisXLimitP
+ OR lrTargetAreaCentralPointXInUse - lrTargetAreaWidthInUse / 2 < gAxis.lrAxisXLimitN THEN
+
+bTargetAreaDatasetOKInUse := FALSE;
+
+ELSIF lrTargetAreaHeightInUse / 2 + lrTargetAreaCentralPointYInUse > gAxis.lrAxisYLimitP
+ OR lrTargetAreaCentralPointYInUse - lrTargetAreaHeightInUse / 2 < gAxis.lrAxisYLimitN THEN
+
+bTargetAreaDatasetOKInUse := FALSE;
+
+    END_IF
+]]></ST>
+      </Implementation>
+    </Action>
+    <Action Name="Act_ViewInfoCheck" Id="{5dc58cef-e242-4b30-95c5-21a7db8d93d6}">
+      <Implementation>
+        <ST><![CDATA[END_PROGRAM
+
+    // 视野高和宽均不能为0
+
+
+ IF gHMI.lrViewHeight * gHMI.lrViewWidth <> 0 THEN
+ gHMI.bViewDatasetOK := TRUE;
+
+gHMI.wsViewDiag := " 参数OK";
+
+ELSE
+ gHMI.bViewDatasetOK := FALSE;
+
+IF gHMI.lrViewHeight = 0 THEN
+
+gHMI.wsViewDiag := " 视野宽不能为0！";
+
+ELSIF gHMI.lrViewWidth = 0 THEN
+
+gHMI.wsViewDiag := " 视野高不能为0！";
+
+    END_IF
+
+END_IF
+
+
+    // 加工中的参数检查
+ 
+
+ IF lrViewHeightInUse * lrViewWidthInUse <> 0 THEN
+ bViewDatasetOKInUse := TRUE;
+
+ELSE
+ bViewDatasetOKInUse := FALSE;
+
+END_IF
+]]></ST>
+      </Implementation>
+    </Action>
+    <LineIds Name="PRG_MachineFunction">
+      <LineId Id="3" Count="24" />
+      <LineId Id="2" Count="0" />
+    </LineIds>
+    <LineIds Name="PRG_MachineFunction.Act_CalcNextRowData">
+      <LineId Id="2" Count="30" />
+      <LineId Id="1" Count="0" />
+    </LineIds>
+    <LineIds Name="PRG_MachineFunction.Act_GetProcessPlan">
+      <LineId Id="2" Count="84" />
+      <LineId Id="1" Count="0" />
+    </LineIds>
+    <LineIds Name="PRG_MachineFunction.Act_GoToStartPreparePosition">
+      <LineId Id="2" Count="77" />
+      <LineId Id="1" Count="0" />
+    </LineIds>
+    <LineIds Name="PRG_MachineFunction.Act_PersistentData">
+      <LineId Id="2" Count="7" />
+      <LineId Id="1" Count="0" />
+    </LineIds>
+    <LineIds Name="PRG_MachineFunction.Act_SingleRowFlowControl">
+      <LineId Id="2" Count="145" />
+      <LineId Id="1" Count="0" />
+    </LineIds>
+    <LineIds Name="PRG_MachineFunction.Act_TargetAreaInfoCheck">
+      <LineId Id="2" Count="34" />
+      <LineId Id="1" Count="0" />
+    </LineIds>
+    <LineIds Name="PRG_MachineFunction.Act_ViewInfoCheck">
+      <LineId Id="2" Count="18" />
+      <LineId Id="1" Count="0" />
+    </LineIds>
+  </POU>
+</TcPlcObject>

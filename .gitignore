@@ -1,0 +1,17 @@
+# Build output
+bin/
+obj/
+*.user
+*.suo
+*.vsix
+*.pdb
+
+# VS / Rider
+.vs/
+.idea/
+
+# Test scratch tooling
+testdata/*.ps1
+testdata/*.txt
+testdata/*.before
+testdata/**/*.before

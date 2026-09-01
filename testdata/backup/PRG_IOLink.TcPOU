@@ -1,0 +1,164 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.12">
+  <POU Name="PRG_IOLink" Id="{4dff0efe-d3e8-4839-a892-d6733bb5ecbc}" SpecialFunc="None">
+    <Declaration><![CDATA[PROGRAM PRG_IOLink
+
+
+VAR
+
+    END_VAR
+
+END_PROGRAM
+
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[
+
+
+]]></ST>
+    </Implementation>
+    <Action Name="ACT_InputsFromHMI" Id="{cb729aef-3979-458c-8c7f-dfd81ee5ab3c}">
+      <Implementation>
+        <ST><![CDATA[END_PROGRAM
+
+    (*采集来自HMI/上位机的通讯数据—>PLC中相同的数据结构体—>方便手动调试与信号屏蔽*)
+
+    //	MEMCPY(ADR(gHMI.stVar2HMI), ADR(gHMI.stVar2HMIEx), SIZEOF(gHMI.stVar2HMI));
+]]></ST>
+      </Implementation>
+    </Action>
+    <Action Name="Act_InputsFromIO" Id="{211f0890-49cb-4f74-a8af-fbb15eb52a42}">
+      <Implementation>
+        <ST><![CDATA[END_PROGRAM
+
+    (*采集外部IO信号—>链接到PLC变量上*)
+
+gIO.bNlimitX := gIO.Term2_1889.bIn1;
+
+    //gIO.bNlimitX		:=		gIO.Term2_1889.bIn2;
+
+
+ gIO.bNlimitY := gIO.Term2_1889.bIn3;
+
+    //gIO.bNlimitX		:=		gIO.Term2_1889.bIn4;
+
+
+ gIO.bNlimitZ := gIO.Term2_1889.bIn5;
+
+    //gIO.bNlimitX		:=		gIO.Term2_1889.bIn6;
+
+
+    //gIO.bNlimitX		:=		gIO.Term2_1889.bIn7;
+ 
+
+    //gIO.bNlimitX		:=		gIO.Term2_1889.bIn8;
+ 
+
+ gIO.bAuto_Manual := gIO.Term2_1889.bIn9;
+
+gIO.bReady := gIO.Term2_1889.bIn10;
+
+    //gIO.bNlimitX		:=		gIO.Term2_1889.bIn11;
+
+
+ gIO.bStart := gIO.Term2_1889.bIn12;
+
+    //gIO.bNlimitX		:=		gIO.Term2_1889.bIn13;
+
+
+    //gIO.bNlimitX		:=		gIO.Term2_1889.bIn14;
+ 
+
+    //gIO.bNlimitX		:=		gIO.Term2_1889.bIn15;
+ 
+
+    //gIO.bNlimitX		:=		gIO.Term2_1889.bIn16;
+ 
+
+
+
+
+ gIO.bStop := gIO.Term6_1904.bIn2;
+]]></ST>
+      </Implementation>
+    </Action>
+    <Action Name="Act_OutputsToHMI" Id="{8da1d637-167c-49ef-8a2b-d9590f7601a3}">
+      <Implementation>
+        <ST><![CDATA[END_PROGRAM
+
+    (*将PLC的运行数据传输给上位机/HMI用作显示*)
+
+    //	MEMCPY(ADR(gHMI.stVar2HMIEx), ADR(gHMI.stVar2HMI), SIZEOF(gHMI.stVar2HMI));
+
+
+
+
+
+    // 给Unity传输轴位置信息
+ 
+
+ gHMI.lrXActPos := afbAxis [AxisXNum].lrActPosition;
+
+gHMI.lrYActPos := afbAxis [AxisYNum].lrActPosition;
+
+gHMI.lrZActPos := afbAxis [AxisZNum].lrActPosition;
+]]></ST>
+      </Implementation>
+    </Action>
+    <Action Name="Act_OutputsToIO" Id="{1e7fefd3-8536-4905-95cd-b270c5f2aae2}">
+      <Implementation>
+        <ST><![CDATA[END_PROGRAM
+
+    (*将PLC变量数据输出至对应的外部IO/执行器*)
+
+
+
+
+    //gIO.Term3_2809.bOut1	:=		gIO.lightRed;
+
+
+    //gIO.Term3_2809.bOut2	:=		gIO.lightRed;
+ 
+
+    //gIO.Term3_2809.bOut3	:=		gIO.lightRed;
+ 
+
+ gIO.Term3_2809.bOut4 := gIO.lightRed;
+
+gIO.Term3_2809.bOut5 := gIO.lightYellow;
+
+gIO.Term3_2809.bOut6 := gIO.lightGreen;
+
+    //gIO.Term3_2809.bOut7	:=		gIO.lightRed;
+
+
+    //gIO.Term3_2809.bOut8	:=		gIO.lightRed;
+ 
+
+    //gIO.Term3_2809.bOut9	:=		gIO.lightRed;
+ 
+
+    //gIO.Term3_2809.bOut10	:=		gIO.lightRed;
+ 
+
+    //gIO.Term3_2809.bOut11	:=		gIO.lightRed;
+ 
+
+    //gIO.Term3_2809.bOut12	:=		gIO.lightRed;
+ 
+
+    //gIO.Term3_2809.bOut13	:=		gIO.lightRed;
+ 
+
+    //gIO.Term3_2809.bOut14	:=		gIO.lightRed;
+ 
+
+    //gIO.Term3_2809.bOut15	:=		gIO.lightRed;
+ 
+
+    //gIO.Term3_2809.bOut16	:=		gIO.lightRed;
+]]></ST>
+      </Implementation>
+    </Action>
+  </POU>
+</TcPlcObject>

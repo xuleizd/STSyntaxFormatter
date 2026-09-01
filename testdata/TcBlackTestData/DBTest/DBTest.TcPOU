@@ -1,0 +1,81 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.16">
+  <POU Name="DBTest" Id="{c4176d62-33bc-4c25-bb2c-7a9773f7c879}" SpecialFunc="None">
+    <Declaration><![CDATA[PROGRAM DBTest
+VAR
+    db : DBManager;
+    // 触发信号
+    connect : BOOL;
+    insert : BOOL;
+    query : BOOL;
+    update : BOOL;
+    // 数据
+    newEntry : TableEntry;
+    queryResult : TableEntry;
+    queryCount : UDINT;
+    
+    // 状态监视
+    connError : DWORD;
+    opError : BOOL;
+    opDone : BOOL;
+    errorID : UDINT;
+    errorMsg : STRING;
+END_VAR
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[// ===== 连接数据库 =====
+db.Connect(
+    execute := connect,
+    serverIP := gvl.DBInfo.DBIp,
+    dbName := gvl.DBInfo.DBName,
+    userName := gvl.DBInfo.UserName,
+    password := gvl.DBInfo.Password,
+    Connect => connError
+    );
+
+// ===== 插入新记录 =====
+newEntry.ID := 4;
+newEntry.JS := "aaa";
+newEntry.FTPBROWSE := TRUE;
+newEntry.FTPDOWN := TRUE;
+newEntry.DATAEXPORT := FALSE;
+newEntry.DICTEDIT := TRUE;
+newEntry.CREATETAB := FALSE;
+
+db.Insert(
+    execute:=insert,
+    entry:=newEntry,
+    error => opError,
+    done=>opDone,
+    errorID=>errorId,
+    errorMsg=>errorMsg
+    );
+
+// ===== 查询记录（按 ID 筛选） =====
+db.Query(
+    execute := query,
+    tableName := 'sys_userjs',
+    filterID := 2,
+    outResult=>queryResult,
+    Query => opError
+    );
+
+// ===== 更新记录 =====
+newEntry.ID := 2;
+newEntry.JS := "中文测试";
+newEntry.FTPBROWSE := FALSE;
+
+db.Update(
+    execute := update,
+    tableName := 'sys_userjs',
+    entry := newEntry,
+    Update => opError
+    );
+]]></ST>
+    </Implementation>
+    <LineIds Name="DBTest">
+      <LineId Id="2242" Count="47" />
+      <LineId Id="2" Count="0" />
+    </LineIds>
+  </POU>
+</TcPlcObject>

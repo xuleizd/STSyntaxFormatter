@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.16">
+  <DUT Name="ST_ProdEntry" Id="{b5ef3a82-e286-4b34-be9a-84be3468753a}">
+    <Declaration><![CDATA[// 编辑数据表的字段和类型
+TYPE ST_ProdEntry :
+STRUCT
+    ID : UDINT;
+    JS : STRING(50);
+    FTPDOWN : BOOL;
+    DATAEXPORT : BOOL;
+    DICTEDIT : BOOL;
+    CREATETAB : BOOL;
+END_STRUCT
+END_TYPE
+]]></Declaration>
+  </DUT>
+</TcPlcObject>

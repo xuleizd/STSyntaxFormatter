@@ -1,0 +1,49 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.12">
+  <GVL Name="gHMI" Id="{dadff5a3-111a-4b24-a056-8b4688dfcda9}">
+    <Declaration><![CDATA[{attribute 'qualified_only'}
+VAR_GLOBAL
+	// 给Unity传输轴位置信息
+	lrXActPos					:LREAL;
+	lrYActPos					:LREAL;
+	lrZActPos					:LREAL;
+//	stVar2PLC					:ST_Var2PLC;	
+//	stVar2PLCEx					:ST_Var2PLC;
+//	stVar2HMI					:ST_Var2HMI;
+//	stVar2HMIEx					:ST_Var2HMI;
+END_VAR
+
+// 掉电保持
+VAR_GLOBAL PERSISTENT
+	// 视场信息
+	lrViewWidth					:LREAL := 0.1920;
+	lrViewHeight				:LREAL := 0.1536;
+	
+	// 目标区域
+	lrTargetAreaWidth			:LREAL := 10.000;
+	lrTargetAreaHeight			:LREAL := 10.000;
+	lrTargetAreaCentralPointX	:LREAL := 0.0000;
+	lrTargetAreaCentralPointY	:LREAL := 0.0000;	
+	
+	// 加工数据集
+	stProcessingDatasets			:ST_ProcessingDatasets;	
+	lrProcessingVeloX				:LREAL := 10;
+	lrProcessingVeloY				:LREAL := 20;
+	lrProcessingVeloZ				:LREAL := 10;		
+END_VAR
+
+// 非掉电保持
+VAR_GLOBAL
+	// 视场信息
+	bViewDatasetOK			:BOOL;
+	wsViewDiag				:WSTRING;	
+	// 目标区域
+	bTargetAreaDatasetOK	:BOOL;
+	wsTargetAreaDiag		:WSTRING;
+	
+	// 加工数据集
+	bProcessingDatasetOK	:BOOL;
+	wsProcessingDiag		:WSTRING;
+END_VAR]]></Declaration>
+  </GVL>
+</TcPlcObject>

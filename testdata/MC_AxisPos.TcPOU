@@ -1,0 +1,1221 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.12">
+  <POU Name="MC_AxisPos" Id="{6d49efdd-77bd-4ea3-a4d0-dbae633f3344}" SpecialFunc="None">
+    <Declaration><![CDATA[FUNCTION_BLOCK MC_AxisPos
+
+
+VAR_INPUT
+
+Ax : REFERENCETOAXIS_REF;;
+
+    END_VAR
+
+
+
+VAR_INPUT
+    // 开始使能
+ 
+
+    // 正转允许
+ 
+
+    // 反转允许
+ 
+
+    // 超调量0~100.0
+ 
+
+    // 执行复位
+ 
+
+
+    // 执行轴回原点
+ 
+
+    // 原点位置
+ 
+
+    //	// 回原点方式
+ 
+
+    //	iHomeMethod: INT := 34;
+ 
+
+    //	// 回原点速度，P1-01=B：1rpm；=C：0.1rpm
+ 
+
+    //	rHomeSpeed1					:LREAL := 1000;
+ 
+
+    //	// 回原点速度，P1-01=B：1rpm；=C：0.1rpm
+ 
+
+    //	rHomeSpeed2					:LREAL := 100;
+ 
+
+
+    // 执行暂停
+ 
+
+    // 暂停减速度
+ 
+
+
+    // 执行停止
+ 
+
+    // 停止减速度
+ 
+
+
+    // 开始JOGF
+ 
+
+    // 开始JOGB
+ 
+
+    // JOG速度
+ 
+
+    // JOG加速度
+ 
+
+    // JOG减速度
+ 
+
+
+    // 执行速度模式
+ 
+
+    // 速度模式速度
+ 
+
+    // 速度模式加速度
+ 
+
+    // 速度模式减速度
+ 
+
+
+    // 执行相对定位
+ 
+
+    // 相对距离
+ 
+
+    // 相对速度
+ 
+
+    // 相对加速度
+ 
+
+    // 相对减速度
+ 
+
+
+    // 执行绝对定位
+ 
+
+    // 绝对定位位置
+ 
+
+    // 绝对定位速度
+ 
+
+    // 绝对定位加速度
+ 
+
+    // 绝对定位减速度
+ 
+
+    //	// 轴控制命令来自于HMI
+ 
+
+    //	stCmdFromHMI					:ST_AxisCmdFromHMI;
+ 
+
+
+xPowerEn     : BOOL:=FALSE;;
+
+xPosDirEn    : BOOL:=TRUE;;
+
+xNegDirEn    : BOOL:=TRUE;;
+
+lrOverride   : LREAL:=100.0;;
+
+xResetExe    : BOOL;;
+
+xHomeExe     : BOOL;;
+
+lrHomePos    : LREAL;;
+
+{region "hide"}
+
+{endregion}
+
+xHaltExe     : BOOL;;
+
+lrHaltDec    : LREAL;;
+
+xStopExe     : BOOL;;
+
+lrStopDec    : LREAL;;
+
+xJOGFEn      : BOOL;;
+
+xJOGBEn      : BOOL;;
+
+lrJOGVelo    : LREAL;;
+
+lrJOGACC     : LREAL;;
+
+lrJOGDEC     : LREAL;;
+
+xMovVelExe   : BOOL;;
+
+lrMovVelVelo : LREAL;;
+
+lrMovVelAcc  : LREAL;;
+
+lrMovVelDec  : LREAL;;
+
+xMovRelExe   : BOOL;;
+
+lrMovRelDis  : LREAL;;
+
+lrMovRelVelo : LREAL;;
+
+lrMovRelAcc  : LREAL;;
+
+lrMovRelDec  : LREAL;;
+
+xMovAbsExe   : BOOL;;
+
+lrMovAbsPos  : LREAL;;
+
+lrMovAbsVelo : LREAL;;
+
+lrMovAbsAcc  : LREAL;;
+
+lrMovAbsDec  : LREAL;;
+
+    END_VAR
+
+
+
+VAR_OUTPUT
+    // 轴名称
+ 
+ ( 31 ) ;
+    // 轴状态接口
+ 
+
+    // 轴报警
+ 
+
+    // 轴报警代码
+ 
+
+
+    // 命令扭矩
+ 
+
+    // 命令位置
+ 
+
+    // 命令速度
+ 
+
+    // 实际扭矩
+ 
+
+    // 实际位置
+ 
+
+    // 实际速度
+ 
+
+    // 位置跟随误差
+ 
+
+
+    // 使能完成
+ 
+
+    // 使能执行中
+ 
+
+    // 使能报错
+ 
+
+    // 使能错误ID
+ 
+
+
+    // 复位完成
+ 
+
+    // 复位执行中
+ 
+
+    // 复位报警
+ 
+
+    // 复位报警ID
+ 
+
+
+    // JOG执行中
+ 
+
+    // JOG被打断
+ 
+
+    // JOG报错
+ 
+
+    // JOG错误ID
+ 
+
+
+    // 速度到达
+ 
+
+    // 速度执行中
+ 
+
+    // 速度模式轴控制中
+ 
+
+    // 速度指令被打断
+ 
+
+    // 速度指令报警
+ 
+
+    // 速度指令报警ID
+ 
+
+
+    // 回原点完成
+ 
+
+    // 回原点执行中
+ 
+
+    // 回原点被打断
+ 
+
+    // 回原点报错
+ 
+
+    // 回原点错误ID
+ 
+
+
+    // 暂停完成
+ 
+
+    // 暂停执行中
+ 
+
+    // 暂停被打断
+ 
+
+    // 暂停报错
+ 
+
+    // 暂停错误ID
+ 
+
+
+    // 停止完成
+ 
+
+    // 停止中
+ 
+
+    // 停止报错
+ 
+
+    // 停止错误ID
+ 
+
+
+    // 相对定位完成
+ 
+
+    // 相对定位执行中
+ 
+
+    // 相对定位轴控制中
+ 
+
+    // 相对定位被打断
+ 
+
+    // 相对定位报警
+ 
+
+    // 相对定位报警ID
+ 
+
+
+    // 绝对定位完成
+ 
+
+    // 绝对定位执行中
+ 
+
+    // 绝对定位轴控制中
+ 
+
+    // 绝对定位被打断
+ 
+
+    // 绝对定位报警
+ 
+
+    // 绝对定位报警ID
+ 
+
+
+sAxisName         : STRING;
+
+sAxisStatus       : STRING;;
+
+bAxisError        : BOOL;;
+
+{attribute 'displaymode':='hex'}
+
+udiAxisErrorID    : UDINT;;
+
+lrSetTorque       : LREAL;;
+
+lrSetPosition     : LREAL;;
+
+lrSetVelocity     : LREAL;;
+
+lrActTorque       : LREAL;;
+
+lrActPosition     : LREAL;;
+
+lrActVelocity     : LREAL;;
+
+lrActPosDiff      : LREAL;;
+
+bPowerON          : BOOL;;
+
+bPowerBusy        : BOOL;;
+
+bPowerError       : BOOL;;
+
+udiPowerErrorID   : UDINT;;
+
+bResetDone        : BOOL;;
+
+bResetBusy        : BOOL;;
+
+bResetError       : BOOL;;
+
+udiResetErrorID   : UDINT;;
+
+bJOGBusy          : BOOL;;
+
+bJOGComabd        : BOOL;;
+
+bJOGError         : BOOL;;
+
+{attribute 'displaymode':='hex'}
+
+udiJOGErrorID     : UDINT;;
+
+bMovVelInVelocity : BOOL;;
+
+bMovVelBusy       : BOOL;;
+
+bMovVelActive     : BOOL;;
+
+bMovVelCmdAbd     : BOOL;;
+
+bMovVelError      : BOOL;;
+
+{attribute 'displaymode':='hex'}
+
+udiMovVelErrorID  : UDINT;;
+
+bHomeDone         : BOOL;;
+
+bHomeBusy         : BOOL;;
+
+bHomeComabd       : BOOL;;
+
+bHomeError        : BOOL;;
+
+{attribute 'displaymode':='hex'}
+
+udiHomeErrorID    : UDINT;;
+
+bHaltDone         : BOOL;;
+
+bHaltBusy         : BOOL;;
+
+bHaltComAbd       : BOOL;;
+
+bHaltError        : BOOL;;
+
+{attribute 'displaymode':='hex'}
+
+udiHaltErrorID    : UDINT;;
+
+bStopDone         : BOOL;;
+
+bStopBusy         : BOOL;;
+
+bStopError        : BOOL;;
+
+{attribute 'displaymode':='hex'}
+
+udiStopErrorID    : UDINT;;
+
+bMovRelDone       : BOOL;;
+
+bMovRelBusy       : BOOL;;
+
+bMovRelActive     : BOOL;;
+
+bMovRelComAbd     : BOOL;;
+
+bMovRelError      : BOOL;;
+
+{attribute 'displaymode':='hex'}
+
+udiMovRelErrorID  : UDINT;;
+
+bMovAbsDone       : BOOL;;
+
+bMovAbsBusy       : BOOL;;
+
+bMovAbsActive     : BOOL;;
+
+bMovAbsComAbd     : BOOL;;
+
+bMovAbsError      : BOOL;;
+
+{attribute 'displaymode':='hex'}
+
+udiMovAbsErrorID  : UDINT;;
+
+    END_VAR
+
+
+
+VAR
+
+{attribute 'hide'}
+
+eAxisState         : E_AxisState;;
+
+{attribute 'hide'}
+
+fbPower            : MC_Power;;
+
+{attribute 'hide'}
+
+fbReset            : MC_Reset;;
+
+{attribute 'hide'}
+
+fbJOG              : MC_Jog;;
+
+{attribute 'hide'}
+
+fbMovVel           : MC_MoveVelocity;;
+
+{attribute 'hide'}
+
+fbHalt             : MC_Halt;;
+
+{attribute 'hide'}
+
+fbStop             : MC_Stop;;
+
+{attribute 'hide'}
+
+mcSetPos           : MC_SetPosition;;
+
+{attribute 'hide'}
+
+mcHome             : MC_Home;;
+
+{attribute 'hide'}
+
+fbMovRel           : MC_MoveRelative;;
+
+{attribute 'hide'}
+
+fbMovAbs           : MC_MoveAbsolute;;
+
+{attribute 'hide'}
+
+fbAxisInfo         : MC_ReadParameterSet;;
+
+{attribute 'hide'}
+
+stAxisParameterSet : ST_AxisParameterSet;;
+
+    END_VAR
+
+END_FUNCTION_BLOCK
+
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[END_PROGRAM
+
+Act_DataIn ();
+
+
+Act_Power ();
+
+
+Act_Reset ();
+
+
+Act_JOG ();
+
+
+Act_MovVel ();
+
+
+Act_Halt ();
+
+
+Act_Stop ();
+
+
+Act_Home ();
+
+
+Act_MovRel ();
+
+
+Act_MovAbs ();
+]]></ST>
+    </Implementation>
+    <Folder Name="Cyclic" Id="{b8be5516-a214-48c4-ac3f-702726e6a192}" />
+    <Folder Name="OnUse" Id="{b4c1660f-facb-4fdc-a62f-93ce60527126}" />
+    <Action Name="Act_DataIn" Id="{3ed9aa3e-ac69-4381-9b1f-27d9305a8624}" FolderPath="Cyclic\">
+      <Implementation>
+        <ST><![CDATA[END_PROGRAM
+
+{attribute 'hide'}
+
+
+Ax.ReadStatus ();
+
+
+fbAxisInfo.Execute := NOT fbAxisInfo.Busy
+ AND sAxisName = '';
+
+fbAxisInfo (
+Parameter := stAxisParameterSet,
+ Axis := Ax);
+
+
+    // 轴名称
+
+
+ sAxisName := stAxisParameterSet.sAxisName;
+
+    // 轴状态
+
+
+ eAxisState := TO_INT (Ax.Status.MotionState);
+
+sAxisStatus := TO_STRING (eAxisState);
+
+    // 轴报警
+
+
+ bAxisError := Ax.Status.Error;
+
+    // 轴报警代码
+
+
+ udiAxisErrorID := Ax.Status.ErrorID;
+
+    // 命令扭矩
+
+
+ lrSetTorque := Ax.NcToPlc.SetTorque;
+
+    // 命令位置
+
+
+ lrSetPosition := Ax.NcToPlc.SetPos;
+
+    // 命令速度
+
+
+ lrSetVelocity := Ax.NcToPlc.SetVelo;
+
+    // 实际扭矩
+
+
+ lrActTorque := Ax.NcToPlc.ActTorque;
+
+    // 实际位置
+
+
+ lrActPosition := Ax.NcToPlc.ActPos;
+
+    // 实际速度
+
+
+ lrActVelocity := Ax.NcToPlc.ActVelo;
+
+    // 位置跟随误差
+
+
+ lrActPosDiff := Ax.NcToPlc.PosDiff;
+]]></ST>
+      </Implementation>
+    </Action>
+    <Action Name="Act_Halt" Id="{29917f3c-b264-4ba4-8ec6-de60fae7478b}" FolderPath="Cyclic\">
+      <Implementation>
+        <ST><![CDATA[END_PROGRAM
+
+{attribute 'hide'}
+
+
+fbHalt (
+Axis := Ax,
+ Execute := xHaltExe,
+ Deceleration := lrHaltDec,
+ Jerk :=,
+ BufferMode :=,
+ Options :=,
+ Done = > bHaltDone,
+ Busy = > bHaltBusy,
+ Active = >,
+ CommandAborted = > bHaltComAbd,
+ Error = > bHaltError,
+ ErrorID = > udiHaltErrorID);
+]]></ST>
+      </Implementation>
+    </Action>
+    <Action Name="Act_Home" Id="{b52dea21-8c90-4f47-838b-c788bb1cae36}" FolderPath="Cyclic\">
+      <Implementation>
+        <ST><![CDATA[END_PROGRAM
+
+{attribute 'hide'}
+]]></ST>
+      </Implementation>
+    </Action>
+    <Action Name="Act_JOG" Id="{06365809-9104-4c34-9813-767b75f5f27c}" FolderPath="Cyclic\">
+      <Implementation>
+        <ST><![CDATA[END_PROGRAM
+
+{attribute 'hide'}
+
+
+fbJOG (
+Axis := Ax,
+ JogForward := xJOGFEn,
+ JogBackwards := xJOGBEn,
+ Mode := E_JogMode.MC_JOGMODE_CONTINOUS,
+ Position :=,
+ Velocity := lrJOGVelo,
+ Acceleration := lrJOGACC,
+ Deceleration := lrJOGDEC,
+ Jerk :=,
+ Done = >,
+ Busy = > bJOGBusy,
+ Active = >,
+ CommandAborted = > bJOGComabd,
+ Error = > bJOGError,
+ ErrorID = > udiJOGErrorID);
+]]></ST>
+      </Implementation>
+    </Action>
+    <Action Name="Act_MovAbs" Id="{8eff8736-2d30-461c-b7d0-084608d745e1}" FolderPath="Cyclic\">
+      <Implementation>
+        <ST><![CDATA[END_PROGRAM
+
+{attribute 'hide'}
+
+
+
+fbMovAbs (
+Axis := Ax,
+ Execute := xMovAbsExe,
+ Position := lrMovAbsPos,
+ Velocity := lrMovAbsVelo,
+ Acceleration := lrMovAbsAcc,
+ Deceleration := lrMovAbsDec,
+ Jerk :=,
+ BufferMode :=,
+ Options :=,
+ Done = > bMovAbsDone,
+ Busy = > bMovAbsBusy,
+ Active = > bMovAbsActive,
+ CommandAborted = > bMovAbsComAbd,
+ Error = > bMovAbsError,
+ ErrorID = > udiMovAbsErrorID);
+]]></ST>
+      </Implementation>
+    </Action>
+    <Action Name="Act_MovRel" Id="{7186d12b-b8dd-4e86-82a4-7a41d9a0e8fa}" FolderPath="Cyclic\">
+      <Implementation>
+        <ST><![CDATA[END_PROGRAM
+
+{attribute 'hide'}
+
+
+
+fbMovRel (
+Axis := Ax,
+ Execute := xMovRelExe,
+ Distance := lrMovRelDis,
+ Velocity := lrMovRelVelo,
+ Acceleration := lrMovRelAcc,
+ Deceleration := lrMovRelDec,
+ Jerk :=,
+ BufferMode :=,
+ Options :=,
+ Done = > bMovRelDone,
+ Busy = > bMovRelBusy,
+ Active = > bMovRelActive,
+ CommandAborted = > bMovRelComAbd,
+ Error = > bMovRelError,
+ ErrorID = > udiMovRelErrorID);
+]]></ST>
+      </Implementation>
+    </Action>
+    <Action Name="Act_MovVel" Id="{c0a00eec-a3d5-40f8-b35b-c5ce98f57efe}" FolderPath="Cyclic\">
+      <Implementation>
+        <ST><![CDATA[END_PROGRAM
+
+{attribute 'hide'}
+
+
+
+IF fbMovVel.Velocity >= 0 THEN
+
+fbMovVel.Direction := MC_Direction.MC_Positive_Direction;
+
+ELSE
+
+fbMovVel.Direction := MC_Direction.MC_Negative_Direction;
+
+    END_IF
+
+
+fbMovVel (
+Axis := Ax,
+ Execute := xMovVelExe,
+ Velocity := lrMovVelVelo,
+ Acceleration := lrMovVelAcc,
+ Deceleration := lrMovVelDec,
+ Jerk :=,
+ Direction :=,
+ BufferMode :=,
+ Options :=,
+ InVelocity = > bMovVelInVelocity,
+ Busy = > bMovVelBusy,
+ Active = > bMovVelActive,
+ CommandAborted = > bMovVelCmdAbd,
+ Error = > bMovVelError,
+ ErrorID = > udiMovVelErrorID);
+]]></ST>
+      </Implementation>
+    </Action>
+    <Action Name="Act_Power" Id="{cecc187a-e2d4-468a-bb2d-bd1d8ce7908e}" FolderPath="Cyclic\">
+      <Implementation>
+        <ST><![CDATA[END_PROGRAM
+
+{attribute 'hide'}
+
+
+fbPower (
+Axis := Ax,
+ Enable := xPowerEn,
+ Enable_Positive := xPosDirEn,
+ Enable_Negative := xNegDirEn,
+ OVERRIDE := lrOverride,
+ BufferMode :=,
+ Options :=,
+ Status = > bPowerON,
+ Busy = > bPowerBusy,
+ Active = >,
+ Error = > bPowerError,
+ ErrorID = > udiPowerErrorID);
+]]></ST>
+      </Implementation>
+    </Action>
+    <Action Name="Act_Reset" Id="{7ec63848-897e-4fed-8ad1-1ce2920473b2}" FolderPath="Cyclic\">
+      <Implementation>
+        <ST><![CDATA[END_PROGRAM
+
+{attribute 'hide'}
+
+
+
+fbReset (
+Axis := Ax,
+ Execute := xResetExe,
+ Done = > bResetDone,
+ Busy = > bResetBusy,
+ Error = > bResetError,
+ ErrorID = > udiResetErrorID);
+]]></ST>
+      </Implementation>
+    </Action>
+    <Action Name="Act_Stop" Id="{a3ec6a5b-d0d9-4257-9f96-4e0711c49b3a}" FolderPath="Cyclic\">
+      <Implementation>
+        <ST><![CDATA[END_PROGRAM
+
+{attribute 'hide'}
+
+
+
+fbStop (
+Axis := Ax,
+ Execute := xStopExe,
+ Deceleration := lrStopDec,
+ Jerk :=,
+ Options :=,
+ Done = > bStopDone,
+ Busy = > bStopBusy,
+ Active = >,
+ CommandAborted = >,
+ Error = > bStopError,
+ ErrorID = > udiStopErrorID);
+]]></ST>
+      </Implementation>
+    </Action>
+    <Method Name="M_Halt" Id="{7c55ea29-ee40-46d8-8c9e-7c95dec5f241}" FolderPath="OnUse\">
+      <Declaration><![CDATA[METHOD M_Halt : BOOL
+ VAR_INPUT
+ in : BOOL;
+
+
+
+END_VAR
+
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[END_PROGRAM
+
+xHaltExe := in;
+
+
+fbHalt (
+Axis := Ax,
+ Execute := xHaltExe,
+ Deceleration := lrHaltDec,
+ Jerk :=,
+ BufferMode :=,
+ Options :=,
+ Done = > bHaltDone,
+ Busy = > bHaltBusy,
+ Active = >,
+ CommandAborted = > bHaltComAbd,
+ Error = > bHaltError,
+ ErrorID = > udiHaltErrorID);
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="M_Home" Id="{26be82e9-07d0-4bee-8a12-d5e947677d21}" FolderPath="OnUse\">
+      <Declaration><![CDATA[METHOD M_Home : BOOL
+ VAR_INPUT
+ in : BOOL;
+
+
+
+END_VAR
+
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[END_PROGRAM
+
+xHomeExe := in;
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="M_Jog" Id="{e4d92b1e-c428-4ad5-b537-390a0cd098e9}" FolderPath="OnUse\">
+      <Declaration><![CDATA[METHOD M_Jog : BOOL
+ VAR_INPUT
+ in1, in2 : BOOL;
+
+
+
+END_VAR
+
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[END_PROGRAM
+
+xJOGFEn := in1;
+
+xJOGBEn := in2;
+
+
+fbJOG (
+Axis := Ax,
+ JogForward := xJOGFEn,
+ JogBackwards := xJOGBEn,
+ Mode := E_JogMode.MC_JOGMODE_CONTINOUS,
+ Position :=,
+ Velocity := lrJOGVelo,
+ Acceleration := lrJOGACC,
+ Deceleration := lrJOGDEC,
+ Jerk :=,
+ Done = >,
+ Busy = > bJOGBusy,
+ Active = >,
+ CommandAborted = > bJOGComabd,
+ Error = > bJOGError,
+ ErrorID = > udiJOGErrorID);
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="M_MovAbs" Id="{a5001022-efd7-4685-a897-63aabe8f77fa}" FolderPath="OnUse\">
+      <Declaration><![CDATA[METHOD M_MovAbs : BOOL
+ VAR_INPUT
+ in : BOOL;
+
+
+
+END_VAR
+
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[END_PROGRAM
+
+xMovAbsExe := in;
+
+
+fbMovAbs (
+Axis := Ax,
+ Execute := xMovAbsExe,
+ Position := lrMovAbsPos,
+ Velocity := lrMovAbsVelo,
+ Acceleration := lrMovAbsAcc,
+ Deceleration := lrMovAbsDec,
+ Jerk :=,
+ BufferMode :=,
+ Options :=,
+ Done = > bMovAbsDone,
+ Busy = > bMovAbsBusy,
+ Active = > bMovAbsActive,
+ CommandAborted = > bMovAbsComAbd,
+ Error = > bMovAbsError,
+ ErrorID = > udiMovAbsErrorID);
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="M_MovRel" Id="{639ca319-e04f-4712-b9e2-e7349a369ba5}" FolderPath="OnUse\">
+      <Declaration><![CDATA[METHOD M_MovRel : BOOL
+ VAR_INPUT
+ in : BOOL;
+
+
+
+END_VAR
+
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[END_PROGRAM
+
+xMovRelExe := in;
+
+
+fbMovRel (
+Axis := Ax,
+ Execute := xMovRelExe,
+ Distance := lrMovRelDis,
+ Velocity := lrMovRelVelo,
+ Acceleration := lrMovRelAcc,
+ Deceleration := lrMovRelDec,
+ Jerk :=,
+ BufferMode :=,
+ Options :=,
+ Done = > bMovRelDone,
+ Busy = > bMovRelBusy,
+ Active = > bMovRelActive,
+ CommandAborted = > bMovRelComAbd,
+ Error = > bMovRelError,
+ ErrorID = > udiMovRelErrorID);
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="M_MovVelo" Id="{d871928b-742c-48f8-832e-8cd8ba866c94}" FolderPath="OnUse\">
+      <Declaration><![CDATA[METHOD M_MovVelo : BOOL
+ VAR_INPUT
+ in : BOOL;
+
+
+
+END_VAR
+
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[END_PROGRAM
+
+xMovVelExe := in;
+
+
+IF fbMovVel.Velocity >= 0 THEN
+
+fbMovVel.Direction := MC_Direction.MC_Positive_Direction;
+
+ELSE
+
+fbMovVel.Direction := MC_Direction.MC_Negative_Direction;
+
+    END_IF
+
+
+fbMovVel (
+Axis := Ax,
+ Execute := xMovVelExe,
+ Velocity := lrMovVelVelo,
+ Acceleration := lrMovVelAcc,
+ Deceleration := lrMovVelDec,
+ Jerk :=,
+ Direction :=,
+ BufferMode :=,
+ Options :=,
+ InVelocity = > bMovVelInVelocity,
+ Busy = > bMovVelBusy,
+ Active = > bMovVelActive,
+ CommandAborted = > bMovVelCmdAbd,
+ Error = > bMovVelError,
+ ErrorID = > udiMovVelErrorID);
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="M_Power" Id="{34a98d16-93ec-4e6b-9722-808a71fc5abe}" FolderPath="OnUse\">
+      <Declaration><![CDATA[METHOD M_Power : BOOL
+ VAR_INPUT
+ in : BOOL;
+
+
+
+END_VAR
+
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[END_PROGRAM
+
+xPowerEn := in;
+
+
+fbPower (
+Axis := Ax,
+ Enable := xPowerEn,
+ Enable_Positive := xPosDirEn,
+ Enable_Negative := xNegDirEn,
+ OVERRIDE := lrOverride,
+ BufferMode :=,
+ Options :=,
+ Status = > bPowerON,
+ Busy = > bPowerBusy,
+ Active = >,
+ Error = > bPowerError,
+ ErrorID = > udiPowerErrorID);
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="M_Reset" Id="{142c4bdf-35ed-43ce-bd5c-23c79a22a98a}" FolderPath="OnUse\">
+      <Declaration><![CDATA[METHOD M_Reset : BOOL
+ VAR_INPUT
+ in : BOOL;
+
+
+
+END_VAR
+
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[END_PROGRAM
+
+xResetExe := in;
+
+
+fbReset (
+Axis := Ax,
+ Execute := xResetExe,
+ Done = > bResetDone,
+ Busy = > bResetBusy,
+ Error = > bResetError,
+ ErrorID = > udiResetErrorID);
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="M_Stop" Id="{4d60816b-a8dc-4017-a5c7-7537232da67d}" FolderPath="OnUse\">
+      <Declaration><![CDATA[METHOD M_Stop : BOOL
+ VAR_INPUT
+ in : BOOL;
+
+
+
+END_VAR
+
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[END_PROGRAM
+
+xStopExe := in;
+
+
+fbStop (
+Axis := Ax,
+ Execute := xStopExe,
+ Deceleration := lrStopDec,
+ Jerk :=,
+ Options :=,
+ Done = > bStopDone,
+ Busy = > bStopBusy,
+ Active = >,
+ CommandAborted = >,
+ Error = > bStopError,
+ ErrorID = > udiStopErrorID);
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="M_Version" Id="{a81bbb52-ec73-4872-863e-f19e77cb000f}">
+      <Declaration><![CDATA[METHOD M_Version : BOOL
+ VAR_INPUT
+
+
+
+END_VAR
+
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[(* -----------------------------------------版本信息-----------------------------------------
+版本编号：		V1.0.0
+功能说明：		NC PTP简单轴控功能集合，配套Visu_AxisPos，用作PLCHMI调试使用
+开发者：		Long.Yun
+开发时间：		2024.08.23
+
+变更版本：
+版本			变更者		变更时间		变更说明—>
+
+------------------------------------------------------------------------------------------
+v1.1.0			Long.yun	2024.10.08		—>新增和HMI、上位机进行数据交互的接口
+v1.1.2			Long.yun	2024.12.03		—>删除HMI和上位机交互的接口，可以直接将该功能块整体当作一个数据类型来进行索引
+
+
+
+
+*)
+
+END_PROGRAM
+]]></ST>
+      </Implementation>
+    </Method>
+  </POU>
+</TcPlcObject>

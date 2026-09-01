@@ -1,0 +1,2288 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using STFormatterCore.Configuration;
+using STFormatterCore.Lexer;
+using STFormatterCore.Parser;
+using STFormatterCore.Parser.Nodes;
+
+namespace STFormatterCore.Formatter
+{
+    /// <summary>
+    /// Main formatting engine that walks the CST and produces formatted text.
+    /// </summary>
+    public sealed class STFormatter
+    {
+        private readonly FormatterOptions _options;
+        private LineBuilder _output;
+        private IndentationManager _indent;
+        private string _lineEnding;
+
+        // Standard type names for TypeCase application
+        private static readonly HashSet<string> StandardTypes = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "BOOL", "BYTE", "WORD", "DWORD", "LWORD",
+            "SINT", "INT", "DINT", "LINT", "USINT", "UINT", "UDINT", "ULINT",
+            "REAL", "LREAL", "STRING", "WSTRING",
+            "TIME", "DATE", "TIME_OF_DAY", "TOD", "DATE_AND_TIME", "DT",
+            "LTIME", "LDATE", "LDT", "LTOD", "BIT"
+        };
+
+        public STFormatter(FormatterOptions options)
+        {
+            _options = options ?? new FormatterOptions();
+        }
+
+        /// <summary>
+        /// Formats a CST and returns the formatted text.
+        /// </summary>
+        public string Format(CompilationUnit cst, string originalSource)
+        {
+            if (cst == null) return originalSource ?? string.Empty;
+
+            _lineEnding = _options.GetLineEnding(originalSource ?? "");
+            _output = new LineBuilder(_lineEnding);
+            _indent = new IndentationManager(_options.IndentString);
+
+            VisitCompilationUnit(cst);
+
+            var result = RemoveTrailingWhitespace(_output.Build());
+
+            // Normalize blank lines. When KeepEmptyLines is false, remove all blank
+            // lines (TcBlack's removeEmptyLines behaviour). When true, collapse runs
+            // of 3+ blank lines into at most one so the formatter is a fixed point
+            // and re-running it cannot keep accumulating blank lines.
+            result = NormalizeBlankLines(result);
+
+            // (MaxLineLength wrapping happens inside WriteExpressionTokens so it is
+            // CST-aware and idempotent — not as a text post-pass here.)
+
+            // Ensure single trailing newline
+            result = result.TrimEnd(' ', '\t') + _lineEnding;
+
+            return result;
+        }
+
+        #region Visit Dispatch
+
+        private void Visit(SyntaxNode node)
+        {
+            if (node == null) return;
+
+            switch (node)
+            {
+                case CompilationUnit n: VisitCompilationUnit(n); break;
+                case DeclarationBlock n: VisitDeclarationBlock(n); break;
+                case VarBlock n: VisitVarBlock(n); break;
+                case VarDeclaration n: VisitVarDeclaration(n, -1); break;
+                case MethodDeclaration n: VisitMethodDeclaration(n); break;
+                case PropertyDeclaration n: VisitPropertyDeclaration(n); break;
+                case IfStatement n: VisitIfStatement(n); break;
+                case ElsifClause n: VisitElsifClause(n); break;
+                case ElseClause n: VisitElseClause(n); break;
+                case CaseStatement n: VisitCaseStatement(n); break;
+                case CaseBranch n: VisitCaseBranch(n); break;
+                case ForStatement n: VisitForStatement(n); break;
+                case WhileStatement n: VisitWhileStatement(n); break;
+                case RepeatStatement n: VisitRepeatStatement(n); break;
+                case AssignmentStatement n: VisitAssignmentStatement(n); break;
+                case ExpressionStatement n: VisitExpressionStatement(n); break;
+                case AttributeDirective n: VisitAttributeDirective(n); break;
+                case TypeDeclaration n: VisitTypeDeclaration(n); break;
+                case StructBody n: VisitStructBody(n); break;
+                case EnumBody n: VisitEnumBody(n); break;
+                case UnionBody n: VisitUnionBody(n); break;
+                case NamespaceDeclaration n: VisitNamespaceDeclaration(n); break;
+                case UsingDirective n: VisitUsingDirective(n); break;
+                case GetterBlock n: VisitGetterBlock(n); break;
+                case SetterBlock n: VisitSetterBlock(n); break;
+                case UnknownNode n: VisitUnknownNode(n); break;
+                default:
+                    // Fallback: visit children
+                    foreach (var child in node.Children)
+                        Visit(child);
+                    break;
+            }
+        }
+
+        #endregion
+
+        #region Compilation Unit
+
+        private void VisitCompilationUnit(CompilationUnit node)
+        {
+            for (int i = 0; i < node.Children.Count; i++)
+            {
+                if (i > 0)
+                    _output.WriteBlankLine();
+                Visit(node.Children[i]);
+            }
+
+            // Handle EOF trivia (trailing comments at end of file)
+            // The parser doesn't store EOF, but any trailing trivia is on the last child
+        }
+
+        #endregion
+
+        #region Declaration Blocks (PROGRAM, FUNCTION, FUNCTION_BLOCK, INTERFACE)
+
+        private void VisitDeclarationBlock(DeclarationBlock node)
+        {
+            _output.WriteIndent(_indent.CurrentIndent);
+
+            // Write leading trivia of the first token (e.g., header comments)
+            if (node.Tokens.Count > 0)
+                WriteLeadingTrivia(node.Tokens[0]);
+
+            // Write keyword
+            string keyword;
+            switch (node.DeclarationKind)
+            {
+                case DeclarationKind.Program:
+                    keyword = "PROGRAM"; break;
+                case DeclarationKind.Function:
+                    keyword = "FUNCTION"; break;
+                case DeclarationKind.FunctionBlock:
+                    keyword = "FUNCTION_BLOCK"; break;
+                case DeclarationKind.Interface:
+                    keyword = "INTERFACE"; break;
+                default:
+                    keyword = "PROGRAM"; break;
+            }
+
+            _output.WriteKeyword(keyword);
+
+            // Write name and other header tokens (everything except last token which is END_*)
+            var headerTokens = node.Tokens;
+            int endIndex = headerTokens.Count - 1;
+            bool hasEndKeyword = endIndex >= 0 && IsEndKeyword(headerTokens[endIndex].Kind);
+
+            if (hasEndKeyword)
+            {
+                // Write tokens between keyword and END_*
+                for (int i = 1; i < endIndex; i++)
+                {
+                    var tok = headerTokens[i];
+                    WriteLeadingTrivia(tok);
+                    _output.Write(" ");
+                    WriteTokenFormatted(tok);
+                }
+            }
+            else
+            {
+                // No END keyword found, write all remaining tokens
+                for (int i = 1; i < headerTokens.Count; i++)
+                {
+                    var tok = headerTokens[i];
+                    WriteLeadingTrivia(tok);
+                    _output.Write(" ");
+                    WriteTokenFormatted(tok);
+                }
+            }
+
+            _output.WriteLine();
+
+            // Visit body children with increased indent
+            using (_indent.Push())
+            {
+                foreach (var child in node.Children)
+                    Visit(child);
+            }
+
+            // Blank lines before END
+            for (int i = 0; i < _options.BlankLinesBeforeEnd; i++)
+                _output.WriteLine();
+
+            // Write END_* keyword AFTER children. Only when the source actually
+            // contained it — TwinCAT TcPOU Declaration sections hold a partial POU
+            // header (PROGRAM name ... END_VAR) WITHOUT END_PROGRAM, and the
+            // formatter must not synthesize a spurious END_PROGRAM there.
+            if (hasEndKeyword)
+            {
+                var endTok = headerTokens[endIndex];
+                WriteLeadingTrivia(endTok);
+                _output.WriteIndent(_indent.CurrentIndent);
+                _output.WriteKeyword(endTok.Text);
+            }
+            _output.WriteLine();
+        }
+
+        #endregion
+
+        #region VAR Blocks
+
+        private void VisitVarBlock(VarBlock node)
+        {
+            _output.WriteIndent(_indent.CurrentIndent);
+
+            // Write VAR keyword
+            var varKeyword = node.Tokens[0];
+            WriteLeadingTrivia(varKeyword);
+            _output.WriteKeyword(varKeyword.Text);
+
+            // Write optional modifiers (CONSTANT, RETAIN, PERSISTENT)
+            for (int i = 1; i < node.Tokens.Count; i++)
+            {
+                var tok = node.Tokens[i];
+                if (tok.Kind == TokenKind.Keyword_EndVar)
+                    break; // Handle END_VAR later
+                WriteLeadingTrivia(tok);
+                _output.Write(" ");
+                _output.WriteKeyword(tok.Text);
+            }
+
+            _output.WriteLine();
+
+            // Calculate alignment if needed
+            int maxNameLen = 0;
+            if (_options.AlignDeclarations)
+            {
+                foreach (var child in node.Children)
+                {
+                    if (child is VarDeclaration vd)
+                        maxNameLen = Math.Max(maxNameLen, (vd.Name ?? "").Length);
+                }
+            }
+
+            // Visit declarations with increased indent
+            using (_indent.Push())
+            {
+                foreach (var child in node.Children)
+                {
+                    if (child is VarDeclaration vd)
+                        VisitVarDeclaration(vd, maxNameLen);
+                    else
+                        Visit(child);
+                }
+            }
+
+            // Blank lines before END_VAR
+            for (int i = 0; i < _options.BlankLinesBeforeEnd; i++)
+                _output.WriteLine();
+
+            // Write END_VAR
+            var endVar = node.Tokens.LastOrDefault(t => t.Kind == TokenKind.Keyword_EndVar);
+            if (endVar != null)
+            {
+                WriteLeadingTrivia(endVar);
+                _output.WriteIndent(_indent.CurrentIndent);
+                _output.WriteKeyword("END_VAR");
+                WriteTrailingTrivia(endVar);
+            }
+            else
+            {
+                _output.WriteIndent(_indent.CurrentIndent);
+                _output.WriteKeyword("END_VAR");
+            }
+
+            _output.WriteLine();
+
+            // Blank lines after VAR block
+            for (int i = 0; i < _options.BlankLinesAfterVar; i++)
+                _output.WriteLine();
+        }
+
+        private void VisitVarDeclaration(VarDeclaration node, int alignWidth)
+        {
+            _output.WriteIndent(_indent.CurrentIndent);
+
+            // Robustness gate: this visit method reconstructs the declaration from a
+            // role classification (name / AT / address / colon / type / init / ;).
+            // If the token stream contains anything the classifier cannot confidently
+            // account for, we MUST NOT guess — any dropped or reordered token corrupts
+            // compileable TwinCAT code. Fall back to byte-exact verbatim output, the
+            // same policy TcBlack uses for lines it does not understand.
+            if (!IsVarDeclarationShapeWellFormed(node))
+            {
+                WriteTokensVerbatim(node.Tokens);
+                _output.WriteLine();
+                return;
+            }
+
+            // Find tokens by role
+            Token nameToken = null;
+            Token colonToken = null;
+            Token endVarToken = null;
+            var typeTokens = new List<Token>();
+            var initTokens = new List<Token>();
+            var extraNameTokens = new List<Token>(); // comma + extra identifiers (a, b, c : TYPE)
+            Token atToken = null;
+            Token addressToken = null;
+
+            bool pastColon = false;
+            bool pastAssign = false;
+            bool awaitingNameAfterComma = false;
+            bool parenthesizedInit = false; // True when init is Type(args) not := expr
+            Token semicolonToken = null;
+
+            foreach (var tok in node.Tokens)
+            {
+                if (tok.Kind == TokenKind.Keyword_EndVar)
+                {
+                    endVarToken = tok;
+                    break;
+                }
+
+                // Track semicolons separately - they written explicitly
+                if (tok.Kind == TokenKind.Semicolon)
+                {
+                    if (semicolonToken == null)
+                        semicolonToken = tok;
+                    continue;
+                }
+
+                if (!pastColon && tok.Kind == TokenKind.BadToken && tok.Text == ":")
+                {
+                    colonToken = tok;
+                    pastColon = true;
+                    continue;
+                }
+
+                if (!pastColon && tok.Kind == TokenKind.Keyword_At)
+                {
+                    atToken = tok;
+                    continue;
+                }
+
+                if (atToken != null && addressToken == null && !pastColon)
+                {
+                    addressToken = tok;
+                    continue;
+                }
+
+                if (!pastColon && tok.Kind == TokenKind.Assign)
+                {
+                    pastAssign = true;
+                    continue;
+                }
+
+                // Detect parenthesized initialization: Type(args) after colon
+                if (pastColon && !pastAssign && !parenthesizedInit &&
+                    tok.Kind == TokenKind.LeftParen)
+                {
+                    parenthesizedInit = true;
+                }
+
+                if (!pastColon)
+                {
+                    if (tok.Kind == TokenKind.Identifier)
+                    {
+                        if (nameToken == null)
+                            nameToken = tok;
+                        else if (awaitingNameAfterComma)
+                            extraNameTokens.Add(tok);
+                        // else: first name already set and no comma seen — this token
+                        // is unexpected; the shape gate above should have rejected it.
+                    }
+                    else if (tok.Kind == TokenKind.Comma)
+                    {
+                        awaitingNameAfterComma = true;
+                        extraNameTokens.Add(tok); // keep the comma token for writing
+                    }
+                    else if (tok.Kind == TokenKind.Keyword_At)
+                    {
+                        atToken = tok;
+                    }
+                    else if (atToken != null && addressToken == null)
+                    {
+                        addressToken = tok;
+                    }
+                    else if (!pastAssign)
+                    {
+                        // Unknown pre-colon token — must not be silently dropped.
+                        // The shape gate should have caught this case; the safest
+                        // behaviour is to add it as a type token so it is at least
+                        // emitted (never dropped).
+                        typeTokens.Add(tok);
+                    }
+                }
+                else if (pastAssign || parenthesizedInit)
+                {
+                    initTokens.Add(tok);
+                }
+                else
+                {
+                    typeTokens.Add(tok);
+                }
+            }
+
+            // Write name
+            if (nameToken != null)
+            {
+                WriteLeadingTrivia(nameToken);
+                _output.Write(nameToken.Text);
+            }
+
+            // Write additional comma-separated names: a, b, c : TYPE
+            foreach (var extra in extraNameTokens)
+            {
+                if (extra.Kind == TokenKind.Comma)
+                {
+                    _output.Write(",");
+                }
+                else
+                {
+                    WriteLeadingTrivia(extra);
+                    _output.Write(" ");
+                    _output.Write(extra.Text);
+                }
+            }
+
+            // Write AT address
+            if (atToken != null)
+            {
+                WriteLeadingTrivia(atToken);
+                _output.Write(" ");
+                _output.WriteKeyword("AT");
+                if (addressToken != null)
+                {
+                    _output.Write(" ");
+                    _output.Write(addressToken.Text);
+                }
+            }
+
+            // Write colon with alignment
+            if (colonToken != null)
+            {
+                if (alignWidth > 0 && nameToken != null)
+                {
+                    int padding = alignWidth - (nameToken.Text ?? "").Length + 1;
+                    if (padding < 1) padding = 1;
+                    _output.Write(new string(' ', padding));
+                }
+                else
+                {
+                    _output.Write(" ");
+                }
+                _output.Write(":");
+                _output.Write(" ");
+            }
+
+            // Write type tokens with proper spacing
+            for (int j = 0; j < typeTokens.Count; j++)
+            {
+                var tok = typeTokens[j];
+                WriteLeadingTrivia(tok);
+                if (j > 0)
+                {
+                    var prevTypeTok = typeTokens[j - 1];
+                    // No space before/after ( [ ) ] for string length specs like WSTRING(255)
+                    // No space around . for dotted type names like Tc3_EventLogger.I_TcResultEvent
+                    if (tok.Kind == TokenKind.LeftParen || tok.Kind == TokenKind.LeftBracket ||
+                        prevTypeTok.Kind == TokenKind.LeftParen || prevTypeTok.Kind == TokenKind.LeftBracket ||
+                        tok.Kind == TokenKind.RightParen || tok.Kind == TokenKind.RightBracket ||
+                        tok.Kind == TokenKind.Dot || prevTypeTok.Kind == TokenKind.Dot)
+                    {
+                        // No space
+                    }
+                    else
+                    {
+                        _output.Write(" ");
+                    }
+                }
+                WriteTypeToken(tok);
+            }
+
+            // Write initialization
+            if (initTokens.Count > 0)
+            {
+                if (pastAssign)
+                {
+                    // Standard := initialization
+                    if (_options.OperatorSpacing)
+                        _output.Write(" ");
+                    _output.Write(":=");
+                    if (_options.OperatorSpacing)
+                        _output.Write(" ");
+                }
+                // For parenthesized init, no := prefix needed
+                WriteExpressionTokens(initTokens);
+            }
+
+            // Write semicolon
+            _output.Write(";");
+
+            // Write trailing trivia of semicolon token (or last meaningful token)
+            var triviaSource = semicolonToken ?? node.Tokens.LastOrDefault(t => t.Kind != TokenKind.Keyword_EndVar && t.Kind != TokenKind.Semicolon);
+            if (triviaSource != null)
+                WriteTrailingTrivia(triviaSource);
+
+            _output.WriteLine();
+        }
+
+        /// <summary>
+        /// Determines whether the token stream of a variable declaration matches the
+        /// exact shape the role classifier in <see cref="VisitVarDeclaration"/> can
+        /// handle without dropping tokens:
+        ///
+        ///   [name (, /name)*] (AT address)? ':' type (':=' init)? ';'
+        ///
+        /// Any deviation (missing colon/semicolon, more than one AT keyword, a
+        /// DirectAddress that is not the AT address, more than one colon, etc.) means
+        /// we cannot safely reconstruct the line and must fall back to verbatim output.
+        /// </summary>
+        private static bool IsVarDeclarationShapeWellFormed(VarDeclaration node)
+        {
+            int colonCount = 0;
+            int semicolonCount = 0;
+            int atCount = 0;
+            bool colonSeen = false;
+
+            for (int i = 0; i < node.Tokens.Count; i++)
+            {
+                var tok = node.Tokens[i];
+
+                switch (tok.Kind)
+                {
+                    case TokenKind.Keyword_EndVar:
+                        // END_VAR must never be part of a declaration owned by the block;
+                        // if it leaked in here the parser split was already wrong.
+                        return false;
+
+                    case TokenKind.Semicolon:
+                        semicolonCount++;
+                        colonSeen = true; // semicolon terminates the declaration
+                        break;
+
+                    case TokenKind.Keyword_At:
+                        atCount++;
+                        break;
+
+                    case TokenKind.DirectAddress:
+                        // A direct address (%) is only ever safe in two positions:
+                        //  - immediately after a single AT keyword (the AT address),
+                        //  - inside the initialisation expression (after ':=').
+                        // The parser only produces "AT %addr" sequences correctly for
+                        // the first case; anything else (e.g. "x AT AT%I* : ..." or a
+                        // stray % token) cannot be classified and must be left alone.
+                        {
+                            bool afterColon = colonSeen;
+                            bool followingSingleAt =
+                                atCount == 1 &&
+                                i - 1 >= 0 &&
+                                node.Tokens[i - 1].Kind == TokenKind.Keyword_At;
+                            if (!afterColon && !followingSingleAt)
+                                return false;
+                        }
+                        break;
+
+                    case TokenKind.BadToken:
+                        if (tok.Text == ":")
+                        {
+                            colonCount++;
+                            colonSeen = true;
+                        }
+                        break;
+
+                    case TokenKind.Assign:
+                        // ':=' starts the initialisation; tokens after it are fully
+                        // supported via initTokens.
+                        break;
+
+                    default:
+                        break;
+                }
+
+                // Track that a directly-following AT address was consumed.
+                if (tok.Kind == TokenKind.Keyword_At && i + 1 < node.Tokens.Count)
+                {
+                    var next = node.Tokens[i + 1].Kind;
+                    if (next == TokenKind.DirectAddress ||
+                        next == TokenKind.Identifier ||
+                        next == TokenKind.IntegerLiteral)
+                    {
+                        // fine — AT followed by a recognisable address token
+                    }
+                    else
+                    {
+                        // "AT" with no recognisable address right after it —
+                        // the classifier would leave the address token behind.
+                        return false;
+                    }
+                }
+            }
+
+            // The role classifier requires exactly one colon and one semicolon.
+            if (colonCount != 1) return false;
+            if (semicolonCount != 1) return false;
+
+            // Two consecutive AT keywords (e.g. malformed "x AT AT%I* : ...") is the
+            // case that triggered content corruption; refuse to guess.
+            if (atCount > 1) return false;
+
+            return true;
+        }
+
+        /// <summary>
+        /// Writes a node's tokens byte-for-byte, preserving every token's original
+        /// text and the original leading/trailing trivia (whitespace, newlines,
+        /// comments) exactly as it appeared in the source.
+        /// </summary>
+        private void WriteTokensVerbatim(System.Collections.Generic.IEnumerable<Token> tokens)
+        {
+            foreach (var tok in tokens)
+            {
+                if (tok.LeadingTrivia != null)
+                {
+                    foreach (var trivia in tok.LeadingTrivia)
+                        WriteTriviaVerbatim(trivia);
+                }
+
+                _output.Write(tok.Text);
+
+                if (tok.TrailingTrivia != null)
+                {
+                    foreach (var trivia in tok.TrailingTrivia)
+                        WriteTriviaVerbatim(trivia);
+                }
+            }
+        }
+
+        /// <summary>
+        /// Writes a single trivia element verbatim (whitespace, newline, comment).
+        /// </summary>
+        private void WriteTriviaVerbatim(Trivia trivia)
+        {
+            switch (trivia.Kind)
+            {
+                case TriviaKind.Whitespace:
+                    _output.Write(trivia.Text);
+                    break;
+                case TriviaKind.NewLine:
+                    // Preserve the original newline text exactly.
+                    _output.Write(trivia.Text);
+                    break;
+                case TriviaKind.SingleLineComment:
+                case TriviaKind.MultiLineComment:
+                    _output.Write(trivia.Text);
+                    break;
+            }
+        }
+
+        #endregion
+
+        #region Method Declaration
+
+        private void VisitMethodDeclaration(MethodDeclaration node)
+        {
+            _output.WriteIndent(_indent.CurrentIndent);
+
+            // Write header tokens
+            bool wroteFirst = false;
+            foreach (var tok in node.Tokens)
+            {
+                if (tok.Kind == TokenKind.Keyword_EndMethod)
+                    break;
+
+                WriteLeadingTrivia(tok);
+
+                if (wroteFirst)
+                    _output.Write(" ");
+
+                // Write keyword or identifier
+                if (IsKeyword(tok.Kind))
+                    _output.WriteKeyword(tok.Text);
+                else if (tok.Kind == TokenKind.BadToken && tok.Text == ":")
+                    _output.Write(":");
+                else
+                    _output.Write(FormatTypeTokenText(tok));
+
+                wroteFirst = true;
+            }
+
+            _output.WriteLine();
+
+            // Visit body with increased indent
+            using (_indent.Push())
+            {
+                foreach (var child in node.Children)
+                    Visit(child);
+            }
+
+            // Blank lines before END_METHOD
+            for (int i = 0; i < _options.BlankLinesBeforeEnd; i++)
+                _output.WriteLine();
+
+            // Write END_METHOD
+            var endTok = node.Tokens.LastOrDefault(t => t.Kind == TokenKind.Keyword_EndMethod);
+            if (endTok != null)
+            {
+                WriteLeadingTrivia(endTok);
+                _output.WriteIndent(_indent.CurrentIndent);
+                _output.WriteKeyword("END_METHOD");
+                WriteTrailingTrivia(endTok);
+            }
+            else
+            {
+                _output.WriteIndent(_indent.CurrentIndent);
+                _output.WriteKeyword("END_METHOD");
+            }
+            _output.WriteLine();
+        }
+
+        #endregion
+
+        #region Property Declaration
+
+        private void VisitPropertyDeclaration(PropertyDeclaration node)
+        {
+            _output.WriteIndent(_indent.CurrentIndent);
+
+            // Write header tokens
+            bool wroteFirst = false;
+            foreach (var tok in node.Tokens)
+            {
+                if (tok.Kind == TokenKind.Keyword_EndProperty)
+                    break;
+
+                WriteLeadingTrivia(tok);
+
+                if (wroteFirst)
+                    _output.Write(" ");
+
+                if (IsKeyword(tok.Kind))
+                    _output.WriteKeyword(tok.Text);
+                else if (tok.Kind == TokenKind.BadToken && tok.Text == ":")
+                    _output.Write(":");
+                else
+                    _output.Write(FormatTypeTokenText(tok));
+
+                wroteFirst = true;
+            }
+
+            _output.WriteLine();
+
+            // Visit GET/SET blocks with increased indent
+            using (_indent.Push())
+            {
+                foreach (var child in node.Children)
+                    Visit(child);
+            }
+
+            // Blank lines before END_PROPERTY
+            for (int i = 0; i < _options.BlankLinesBeforeEnd; i++)
+                _output.WriteLine();
+
+            // Write END_PROPERTY
+            var endTok = node.Tokens.LastOrDefault(t => t.Kind == TokenKind.Keyword_EndProperty);
+            if (endTok != null)
+            {
+                WriteLeadingTrivia(endTok);
+                _output.WriteIndent(_indent.CurrentIndent);
+                _output.WriteKeyword("END_PROPERTY");
+                WriteTrailingTrivia(endTok);
+            }
+            else
+            {
+                _output.WriteIndent(_indent.CurrentIndent);
+                _output.WriteKeyword("END_PROPERTY");
+            }
+            _output.WriteLine();
+        }
+
+        private void VisitGetterBlock(GetterBlock node)
+        {
+            _output.WriteIndent(_indent.CurrentIndent);
+
+            // Write GET keyword
+            if (node.Tokens.Count > 0)
+            {
+                WriteLeadingTrivia(node.Tokens[0]);
+                _output.WriteKeyword("GET");
+            }
+            _output.WriteLine();
+
+            // Visit body
+            using (_indent.Push())
+            {
+                foreach (var child in node.Children)
+                    Visit(child);
+            }
+
+            // Write END_GET
+            var endTok = node.Tokens.LastOrDefault(t =>
+                t.Kind == TokenKind.Identifier &&
+                t.Text.Equals("END_GET", StringComparison.OrdinalIgnoreCase));
+            if (endTok != null)
+            {
+                WriteLeadingTrivia(endTok);
+                _output.WriteIndent(_indent.CurrentIndent);
+                _output.WriteKeyword("END_GET");
+                WriteTrailingTrivia(endTok);
+            }
+            else
+            {
+                _output.WriteIndent(_indent.CurrentIndent);
+                _output.WriteKeyword("END_GET");
+            }
+            _output.WriteLine();
+        }
+
+        private void VisitSetterBlock(SetterBlock node)
+        {
+            _output.WriteIndent(_indent.CurrentIndent);
+
+            // Write SET keyword
+            if (node.Tokens.Count > 0)
+            {
+                WriteLeadingTrivia(node.Tokens[0]);
+                _output.WriteKeyword("SET");
+            }
+            _output.WriteLine();
+
+            // Visit body
+            using (_indent.Push())
+            {
+                foreach (var child in node.Children)
+                    Visit(child);
+            }
+
+            // Write END_SET
+            var endTok = node.Tokens.LastOrDefault(t =>
+                t.Kind == TokenKind.Identifier &&
+                t.Text.Equals("END_SET", StringComparison.OrdinalIgnoreCase));
+            if (endTok != null)
+            {
+                WriteLeadingTrivia(endTok);
+                _output.WriteIndent(_indent.CurrentIndent);
+                _output.WriteKeyword("END_SET");
+                WriteTrailingTrivia(endTok);
+            }
+            else
+            {
+                _output.WriteIndent(_indent.CurrentIndent);
+                _output.WriteKeyword("END_SET");
+            }
+            _output.WriteLine();
+        }
+
+        #endregion
+
+        #region Control Flow Statements
+
+        private void VisitIfStatement(IfStatement node)
+        {
+            string ifIndent = _indent.CurrentIndent;
+            _output.WriteIndent(ifIndent);
+
+            // Separate tokens into IF header (IF keyword + condition) and structural keywords
+            var condTokens = new List<Token>();
+            Token thenToken = null;
+
+            foreach (var tok in node.Tokens)
+            {
+                if (tok.Kind == TokenKind.Keyword_Then)
+                {
+                    thenToken = tok;
+                    continue;
+                }
+                if (tok.Kind == TokenKind.Keyword_EndIf)
+                    continue; // Handle END_IF directly
+                if (tok.Kind == TokenKind.Keyword_If)
+                {
+                    WriteLeadingTrivia(tok);
+                    _output.WriteKeyword("IF");
+                    continue;
+                }
+                condTokens.Add(tok);
+            }
+
+            // Write condition
+            _output.Write(" ");
+            WriteExpressionTokens(condTokens);
+
+            // Write THEN
+            if (thenToken != null)
+            {
+                WriteLeadingTrivia(thenToken);
+                _output.Write(" ");
+                _output.WriteKeyword("THEN");
+            }
+            _output.WriteLine();
+
+            // Visit body children with increased indent.
+            // ELSIF/ELSE/END_IF are written at the IF indent level (saved above).
+            using (_indent.Push())
+            {
+                foreach (var child in node.Children)
+                {
+                    if (child is ElsifClause elsif)
+                    {
+                        // Write ELSIF at IF level (not body level)
+                        _output.WriteIndent(ifIndent);
+                        WriteElsifAtParentLevel(elsif);
+                    }
+                    else if (child is ElseClause elseClause)
+                    {
+                        // Write ELSE at IF level (not body level)
+                        _output.WriteIndent(ifIndent);
+                        WriteElseAtParentLevel(elseClause);
+                    }
+                    else
+                    {
+                        Visit(child);
+                    }
+                }
+            }
+
+            // Write END_IF at IF level
+            var endIfToken = node.Tokens.LastOrDefault(t => t.Kind == TokenKind.Keyword_EndIf);
+            if (endIfToken != null)
+            {
+                _output.WriteIndent(ifIndent);
+                WriteLeadingTrivia(endIfToken);
+                _output.WriteKeyword("END_IF");
+                WriteTrailingTrivia(endIfToken);
+            }
+            else
+            {
+                _output.WriteIndent(ifIndent);
+                _output.WriteKeyword("END_IF");
+            }
+            _output.WriteLine();
+        }
+
+        /// <summary>
+        /// Writes a blank line before a clause keyword (ELSIF/ELSE/END_IF) if the original
+        /// source had a blank line there, to preserve intentional spacing.
+        /// </summary>
+        private void WriteClauseBlankLineIfNeeded(Token clauseToken)
+        {
+            if (clauseToken?.LeadingTrivia == null) return;
+            int newlineCount = 0;
+            foreach (var trivia in clauseToken.LeadingTrivia)
+            {
+                if (trivia.Kind == TriviaKind.NewLine)
+                    newlineCount++;
+            }
+            // 2+ newlines in leading trivia means there was a blank line in source
+            if (newlineCount >= 2)
+                _output.WriteBlankLine();
+        }
+
+        /// <summary>
+        /// Writes an ELSIF clause at the parent (IF) indent level.
+        /// The body is visited at the current indent level (already IF+1).
+        /// </summary>
+        private void WriteElsifAtParentLevel(ElsifClause node)
+        {
+            var condTokens = new List<Token>();
+            Token thenToken = null;
+
+            foreach (var tok in node.Tokens)
+            {
+                if (tok.Kind == TokenKind.Keyword_Elsif)
+                {
+                    WriteLeadingTrivia(tok);
+                    _output.WriteKeyword("ELSIF");
+                    continue;
+                }
+                if (tok.Kind == TokenKind.Keyword_Then)
+                {
+                    thenToken = tok;
+                    continue;
+                }
+                condTokens.Add(tok);
+            }
+
+            _output.Write(" ");
+            WriteExpressionTokens(condTokens);
+
+            if (thenToken != null)
+            {
+                WriteLeadingTrivia(thenToken);
+                _output.Write(" ");
+                _output.WriteKeyword("THEN");
+            }
+            _output.WriteLine();
+
+            // Body is at current indent level (already IF+1 from outer Push)
+            foreach (var child in node.Children)
+                Visit(child);
+        }
+
+        /// <summary>
+        /// Writes an ELSE clause at the parent (IF) indent level.
+        /// The body is visited at the current indent level (already IF+1).
+        /// </summary>
+        private void WriteElseAtParentLevel(ElseClause node)
+        {
+            if (node.Tokens.Count > 0)
+            {
+                WriteLeadingTrivia(node.Tokens[0]);
+            }
+            _output.WriteKeyword("ELSE");
+            _output.WriteLine();
+
+            // Body is at current indent level (already IF+1 from outer Push)
+            foreach (var child in node.Children)
+                Visit(child);
+        }
+
+        private void VisitElsifClause(ElsifClause node)
+        {
+            _output.WriteIndent(_indent.CurrentIndent);
+
+            var condTokens = new List<Token>();
+            Token thenToken = null;
+
+            foreach (var tok in node.Tokens)
+            {
+                if (tok.Kind == TokenKind.Keyword_Elsif)
+                {
+                    WriteLeadingTrivia(tok);
+                    _output.WriteKeyword("ELSIF");
+                    continue;
+                }
+                if (tok.Kind == TokenKind.Keyword_Then)
+                {
+                    thenToken = tok;
+                    continue;
+                }
+                condTokens.Add(tok);
+            }
+
+            _output.Write(" ");
+            WriteExpressionTokens(condTokens);
+
+            if (thenToken != null)
+            {
+                WriteLeadingTrivia(thenToken);
+                _output.Write(" ");
+                _output.WriteKeyword("THEN");
+            }
+            _output.WriteLine();
+
+            using (_indent.Push())
+            {
+                foreach (var child in node.Children)
+                    Visit(child);
+            }
+        }
+
+        private void VisitElseClause(ElseClause node)
+        {
+            _output.WriteIndent(_indent.CurrentIndent);
+
+            if (node.Tokens.Count > 0)
+            {
+                WriteLeadingTrivia(node.Tokens[0]);
+                _output.WriteKeyword("ELSE");
+            }
+            else
+            {
+                _output.WriteKeyword("ELSE");
+            }
+            _output.WriteLine();
+
+            using (_indent.Push())
+            {
+                foreach (var child in node.Children)
+                    Visit(child);
+            }
+        }
+
+        private void VisitCaseStatement(CaseStatement node)
+        {
+            _output.WriteIndent(_indent.CurrentIndent);
+
+            var selectorTokens = new List<Token>();
+            Token ofToken = null;
+            Token endCaseToken = null;
+
+            foreach (var tok in node.Tokens)
+            {
+                if (tok.Kind == TokenKind.Keyword_Case)
+                {
+                    WriteLeadingTrivia(tok);
+                    _output.WriteKeyword("CASE");
+                    continue;
+                }
+                if (tok.Kind == TokenKind.Keyword_Of)
+                {
+                    ofToken = tok;
+                    continue;
+                }
+                if (tok.Kind == TokenKind.Keyword_EndCase)
+                {
+                    endCaseToken = tok;
+                    continue;
+                }
+                selectorTokens.Add(tok);
+            }
+
+            _output.Write(" ");
+            WriteExpressionTokens(selectorTokens);
+
+            if (ofToken != null)
+            {
+                WriteLeadingTrivia(ofToken);
+                _output.Write(" ");
+                _output.WriteKeyword("OF");
+            }
+            _output.WriteLine();
+
+            // Visit branches with increased indent
+            using (_indent.Push())
+            {
+                foreach (var child in node.Children)
+                    Visit(child);
+            }
+
+            // Blank lines before END_CASE
+            for (int i = 0; i < _options.BlankLinesBeforeEnd; i++)
+                _output.WriteLine();
+
+            // Write END_CASE
+            if (endCaseToken != null)
+            {
+                WriteLeadingTrivia(endCaseToken);
+                _output.WriteIndent(_indent.CurrentIndent);
+                _output.WriteKeyword("END_CASE");
+                WriteTrailingTrivia(endCaseToken);
+            }
+            else
+            {
+                _output.WriteIndent(_indent.CurrentIndent);
+                _output.WriteKeyword("END_CASE");
+            }
+            _output.WriteLine();
+        }
+
+        private void VisitCaseBranch(CaseBranch node)
+        {
+            _output.WriteIndent(_indent.CurrentIndent);
+
+            // Write case values (everything except colon).
+            // Write comments from leading trivia but skip newlines to prevent
+            // comments from splitting the value from its colon.
+            bool wroteColon = false;
+            Token prevTok = null;
+            foreach (var tok in node.Tokens)
+            {
+                if (tok.Kind == TokenKind.BadToken && tok.Text == ":")
+                {
+                    _output.Write(":");
+                    wroteColon = true;
+                    prevTok = tok;
+                    continue;
+                }
+                // Write comments from leading trivia
+                if (tok.LeadingTrivia != null)
+                {
+                    foreach (var trivia in tok.LeadingTrivia)
+                    {
+                        if (trivia.Kind == TriviaKind.SingleLineComment ||
+                            trivia.Kind == TriviaKind.MultiLineComment)
+                        {
+                            if (_output.IsAtLineStart)
+                                _output.WriteIndent(_indent.CurrentIndent);
+                            _output.Write(trivia.Text);
+                            if (trivia.Kind == TriviaKind.SingleLineComment)
+                            {
+                                _output.WriteLine();
+                                // After comment newline, re-write indent for the label
+                                _output.WriteIndent(_indent.CurrentIndent);
+                            }
+                        }
+                        // Skip NewLine/Whitespace trivia
+                    }
+                }
+                // No space before comma or colon
+                if (prevTok != null &&
+                    prevTok.Kind != TokenKind.Comma &&
+                    tok.Kind != TokenKind.Comma &&
+                    !(tok.Kind == TokenKind.BadToken && tok.Text == ":"))
+                    _output.Write(" ");
+                WriteTokenFormatted(tok);
+                prevTok = tok;
+            }
+
+            if (!wroteColon)
+                _output.Write(":");
+
+            _output.WriteLine();
+
+            // Visit body statements
+            using (_indent.Push())
+            {
+                foreach (var child in node.Children)
+                    Visit(child);
+            }
+        }
+
+        private void VisitForStatement(ForStatement node)
+        {
+            _output.WriteIndent(_indent.CurrentIndent);
+
+            var bodyTokens = new List<Token>();
+            Token doToken = null;
+            Token endForToken = null;
+
+            foreach (var tok in node.Tokens)
+            {
+                if (tok.Kind == TokenKind.Keyword_For)
+                {
+                    WriteLeadingTrivia(tok);
+                    _output.WriteKeyword("FOR");
+                    continue;
+                }
+                if (tok.Kind == TokenKind.Keyword_Do)
+                {
+                    doToken = tok;
+                    continue;
+                }
+                if (tok.Kind == TokenKind.Keyword_EndFor)
+                {
+                    endForToken = tok;
+                    continue;
+                }
+                bodyTokens.Add(tok);
+            }
+
+            // Write loop control: counter := start TO end BY step
+            _output.Write(" ");
+            WriteForExpressionTokens(bodyTokens);
+
+            if (doToken != null)
+            {
+                WriteLeadingTrivia(doToken);
+                _output.Write(" ");
+                _output.WriteKeyword("DO");
+            }
+            _output.WriteLine();
+
+            using (_indent.Push())
+            {
+                foreach (var child in node.Children)
+                    Visit(child);
+            }
+
+            for (int i = 0; i < _options.BlankLinesBeforeEnd; i++)
+                _output.WriteLine();
+
+            if (endForToken != null)
+            {
+                WriteLeadingTrivia(endForToken);
+                _output.WriteIndent(_indent.CurrentIndent);
+                _output.WriteKeyword("END_FOR");
+                WriteTrailingTrivia(endForToken);
+            }
+            else
+            {
+                _output.WriteIndent(_indent.CurrentIndent);
+                _output.WriteKeyword("END_FOR");
+            }
+            _output.WriteLine();
+        }
+
+        private void VisitWhileStatement(WhileStatement node)
+        {
+            _output.WriteIndent(_indent.CurrentIndent);
+
+            var condTokens = new List<Token>();
+            Token doToken = null;
+            Token endWhileToken = null;
+
+            foreach (var tok in node.Tokens)
+            {
+                if (tok.Kind == TokenKind.Keyword_While)
+                {
+                    WriteLeadingTrivia(tok);
+                    _output.WriteKeyword("WHILE");
+                    continue;
+                }
+                if (tok.Kind == TokenKind.Keyword_Do)
+                {
+                    doToken = tok;
+                    continue;
+                }
+                if (tok.Kind == TokenKind.Keyword_EndWhile)
+                {
+                    endWhileToken = tok;
+                    continue;
+                }
+                condTokens.Add(tok);
+            }
+
+            _output.Write(" ");
+            WriteExpressionTokens(condTokens);
+
+            if (doToken != null)
+            {
+                WriteLeadingTrivia(doToken);
+                _output.Write(" ");
+                _output.WriteKeyword("DO");
+            }
+            _output.WriteLine();
+
+            using (_indent.Push())
+            {
+                foreach (var child in node.Children)
+                    Visit(child);
+            }
+
+            for (int i = 0; i < _options.BlankLinesBeforeEnd; i++)
+                _output.WriteLine();
+
+            if (endWhileToken != null)
+            {
+                WriteLeadingTrivia(endWhileToken);
+                _output.WriteIndent(_indent.CurrentIndent);
+                _output.WriteKeyword("END_WHILE");
+                WriteTrailingTrivia(endWhileToken);
+            }
+            else
+            {
+                _output.WriteIndent(_indent.CurrentIndent);
+                _output.WriteKeyword("END_WHILE");
+            }
+            _output.WriteLine();
+        }
+
+        private void VisitRepeatStatement(RepeatStatement node)
+        {
+            _output.WriteIndent(_indent.CurrentIndent);
+
+            Token untilToken = null;
+            var condTokens = new List<Token>();
+            Token endRepeatToken = null;
+
+            foreach (var tok in node.Tokens)
+            {
+                if (tok.Kind == TokenKind.Keyword_Repeat)
+                {
+                    WriteLeadingTrivia(tok);
+                    _output.WriteKeyword("REPEAT");
+                    continue;
+                }
+                if (tok.Kind == TokenKind.Keyword_Until)
+                {
+                    untilToken = tok;
+                    continue;
+                }
+                if (tok.Kind == TokenKind.Keyword_EndRepeat)
+                {
+                    endRepeatToken = tok;
+                    continue;
+                }
+                // After UNTIL, tokens are condition; before UNTIL they shouldn't exist
+                // but handle gracefully
+                if (untilToken != null)
+                    condTokens.Add(tok);
+            }
+
+            _output.WriteLine();
+
+            using (_indent.Push())
+            {
+                foreach (var child in node.Children)
+                    Visit(child);
+            }
+
+            for (int i = 0; i < _options.BlankLinesBeforeEnd; i++)
+                _output.WriteLine();
+
+            // Write UNTIL condition
+            _output.WriteIndent(_indent.CurrentIndent);
+            if (untilToken != null)
+            {
+                WriteLeadingTrivia(untilToken);
+                _output.WriteKeyword("UNTIL");
+                _output.Write(" ");
+            }
+            else
+            {
+                _output.WriteKeyword("UNTIL");
+                _output.Write(" ");
+            }
+            WriteExpressionTokens(condTokens);
+            _output.Write(";");
+            _output.WriteLine();
+
+            // Write END_REPEAT
+            if (endRepeatToken != null)
+            {
+                WriteLeadingTrivia(endRepeatToken);
+                _output.WriteIndent(_indent.CurrentIndent);
+                _output.WriteKeyword("END_REPEAT");
+                WriteTrailingTrivia(endRepeatToken);
+            }
+            else
+            {
+                _output.WriteIndent(_indent.CurrentIndent);
+                _output.WriteKeyword("END_REPEAT");
+            }
+            _output.WriteLine();
+        }
+
+        #endregion
+
+        #region Assignment and Expression Statements
+
+        private void VisitAssignmentStatement(AssignmentStatement node)
+        {
+            _output.WriteIndent(_indent.CurrentIndent);
+            WriteStatementTokens(node.Tokens);
+        }
+
+        private void VisitExpressionStatement(ExpressionStatement node)
+        {
+            _output.WriteIndent(_indent.CurrentIndent);
+            WriteStatementTokens(node.Tokens);
+        }
+
+        /// <summary>
+        /// Writes tokens for a statement (assignment or expression) with proper formatting.
+        /// </summary>
+        private void WriteStatementTokens(List<Token> tokens)
+        {
+            if (tokens.Count == 0) return;
+
+            // Multi-line function calls / assignments frequently carry inline
+            // trailing comments (e.g. "execute := x, // 中文注释") in the arg tokens'
+            // leading trivia. Collapsing them onto one line would drop or garble
+            // those comments. Preserve the original layout verbatim — matching
+            // TcBlack's "don't touch what you can't safely reformat" policy.
+            if (HasInlineCommentTrivia(tokens))
+            {
+                WriteTokensVerbatim(tokens);
+                _output.WriteLine();
+                return;
+            }
+
+            // Statement tokens: skip newlines (all on one formatted line)
+            WriteExpressionTokens(tokens, preserveMultiLine: false);
+
+            // Write trailing trivia of last token
+            var last = tokens[tokens.Count - 1];
+            WriteTrailingTrivia(last);
+            _output.WriteLine();
+        }
+
+        /// <summary>
+        /// True when any token carries an inline (same-line) comment in its leading
+        /// or trailing trivia — a signal that the statement's layout must be kept.
+        /// </summary>
+        private static bool HasInlineCommentTrivia(List<Token> tokens)
+        {
+            foreach (var tok in tokens)
+            {
+                foreach (var t in tok.LeadingTrivia)
+                    if (t.Kind == TriviaKind.SingleLineComment) return true;
+                foreach (var t in tok.TrailingTrivia)
+                    if (t.Kind == TriviaKind.SingleLineComment) return true;
+            }
+            return false;
+        }
+
+        /// <summary>
+        /// Writes expression tokens with proper spacing, keyword uppercasing, and type case.
+        /// Newlines in leading trivia are skipped in expression context to prevent
+        /// continuation lines from appearing at column 0.
+        /// </summary>
+        private void WriteExpressionTokens(List<Token> tokens, bool preserveMultiLine = true)
+        {
+            for (int i = 0; i < tokens.Count; i++)
+            {
+                var tok = tokens[i];
+                var prev = i > 0 ? tokens[i - 1] : null;
+
+                // Write leading trivia
+                if (tok.LeadingTrivia != null)
+                {
+                    bool wroteNewline = false;
+                    foreach (var trivia in tok.LeadingTrivia)
+                    {
+                        if (trivia.Kind == TriviaKind.NewLine)
+                        {
+                            if (preserveMultiLine)
+                                wroteNewline = true;
+                            continue;
+                        }
+                        if (trivia.Kind == TriviaKind.Whitespace)
+                            continue;
+                        if (trivia.Kind == TriviaKind.SingleLineComment ||
+                            trivia.Kind == TriviaKind.MultiLineComment)
+                        {
+                            // Write any pending newline before comment
+                            if (preserveMultiLine && wroteNewline && !_output.IsAtLineStart)
+                            {
+                                _output.WriteLine();
+                                _output.WriteIndent(_indent.CurrentIndent + new string(' ', _options.IndentSize));
+                                wroteNewline = false;
+                            }
+                            if (_output.IsAtLineStart)
+                                _output.WriteIndent(_indent.CurrentIndent);
+                            _output.Write(trivia.Text);
+                            if (trivia.Kind == TriviaKind.SingleLineComment)
+                                _output.WriteLine();
+                        }
+                    }
+                    // If there was a newline and we're not at line start, write continuation
+                    if (preserveMultiLine && wroteNewline && !_output.IsAtLineStart)
+                    {
+                        _output.WriteLine();
+                        _output.WriteIndent(_indent.CurrentIndent + new string(' ', _options.IndentSize));
+                    }
+                }
+
+                // Max-line-length wrapping: before writing a token that follows a
+                // comma at expression level, break onto a continuation line when the
+                // current line is already at/over the configured limit. This keeps the
+                // wrap inside the token emission loop, so it is CST-aware and idempotent.
+                if (_options.MaxLineLength > 0
+                    && prev != null
+                    && (prev.Kind == TokenKind.Comma
+                        || prev.Kind == TokenKind.OutputAssign)
+                    && _output.CurrentLineLength >= _options.MaxLineLength - _options.IndentSize)
+                {
+                    _output.WriteLine();
+                    _output.WriteIndent(_indent.CurrentIndent + _options.IndentString);
+                }
+
+                // Determine spacing before this token
+                if (NeedsSpaceBefore(tok, prev, _options))
+                    _output.Write(" ");
+
+                WriteTokenFormatted(tok);
+            }
+        }
+
+        /// <summary>
+        /// Writes FOR loop expression tokens, ensuring TO and BY keywords are uppercased.
+        /// </summary>
+        private void WriteForExpressionTokens(List<Token> tokens)
+        {
+            for (int i = 0; i < tokens.Count; i++)
+            {
+                var tok = tokens[i];
+                var prev = i > 0 ? tokens[i - 1] : null;
+
+                WriteLeadingTrivia(tok);
+
+                if (NeedsSpaceBefore(tok, prev, _options))
+                    _output.Write(" ");
+
+                // Special handling for TO and BY keywords in FOR
+                if (tok.Kind == TokenKind.Keyword_To || tok.Kind == TokenKind.Keyword_By)
+                    _output.WriteKeyword(tok.Text);
+                else
+                    WriteTokenFormatted(tok);
+            }
+        }
+
+        #endregion
+
+        #region Attribute Directive
+
+        private void VisitAttributeDirective(AttributeDirective node)
+        {
+            _output.WriteIndent(_indent.CurrentIndent);
+
+            foreach (var tok in node.Tokens)
+            {
+                WriteLeadingTrivia(tok);
+                // Preserve pragma text exactly
+                _output.Write(tok.Text);
+                WriteTrailingTrivia(tok);
+            }
+
+            _output.WriteLine();
+        }
+
+        #endregion
+
+        #region Type Declaration
+
+        private void VisitTypeDeclaration(TypeDeclaration node)
+        {
+            _output.WriteIndent(_indent.CurrentIndent);
+
+            // Write TYPE keyword
+            Token endTypeToken = null;
+            Token semicolonToken = null;
+            bool wroteFirst = false;
+
+            foreach (var tok in node.Tokens)
+            {
+                if (tok.Kind == TokenKind.Keyword_EndType)
+                {
+                    endTypeToken = tok;
+                    break;
+                }
+
+                // The terminating ';' of an enum (TYPE x : (a,b,c);) comes AFTER
+                // the body in source order — save it and write it after children.
+                if (tok.Kind == TokenKind.Semicolon)
+                {
+                    semicolonToken = tok;
+                    continue;
+                }
+
+                WriteLeadingTrivia(tok);
+
+                if (wroteFirst)
+                    _output.Write(" ");
+
+                if (tok.Kind == TokenKind.Keyword_Type)
+                    _output.WriteKeyword("TYPE");
+                else if (tok.Kind == TokenKind.BadToken && tok.Text == ":")
+                    _output.Write(":");
+                else
+                    _output.Write(tok.Text);
+
+                wroteFirst = true;
+            }
+
+            _output.WriteLine();
+
+            // Visit body (STRUCT/ENUM/UNION)
+            using (_indent.Push())
+            {
+                foreach (var child in node.Children)
+                    Visit(child);
+            }
+
+            // Write the enum ';' after the body, before END_TYPE
+            if (semicolonToken != null)
+            {
+                WriteLeadingTrivia(semicolonToken);
+                _output.Write(";");
+                WriteTrailingTrivia(semicolonToken);
+                _output.WriteLine();
+            }
+
+            // Blank lines before END_TYPE
+            for (int i = 0; i < _options.BlankLinesBeforeEnd; i++)
+                _output.WriteLine();
+
+            // Write END_TYPE
+            if (endTypeToken != null)
+            {
+                WriteLeadingTrivia(endTypeToken);
+                _output.WriteIndent(_indent.CurrentIndent);
+                _output.WriteKeyword("END_TYPE");
+                WriteTrailingTrivia(endTypeToken);
+            }
+            else
+            {
+                _output.WriteIndent(_indent.CurrentIndent);
+                _output.WriteKeyword("END_TYPE");
+            }
+            _output.WriteLine();
+        }
+
+        private void VisitStructBody(StructBody node)
+        {
+            _output.WriteIndent(_indent.CurrentIndent);
+
+            // Write STRUCT keyword
+            if (node.Tokens.Count > 0)
+            {
+                WriteLeadingTrivia(node.Tokens[0]);
+                _output.WriteKeyword("STRUCT");
+            }
+            _output.WriteLine();
+
+            // Calculate alignment for struct members
+            int maxNameLen = 0;
+            if (_options.AlignDeclarations)
+            {
+                foreach (var child in node.Children)
+                {
+                    if (child is VarDeclaration vd)
+                        maxNameLen = Math.Max(maxNameLen, (vd.Name ?? "").Length);
+                }
+            }
+
+            // Visit members
+            foreach (var child in node.Children)
+            {
+                if (child is VarDeclaration vd)
+                    VisitVarDeclaration(vd, maxNameLen);
+                else
+                    Visit(child);
+            }
+
+            // Write END_STRUCT
+            var endTok = node.Tokens.LastOrDefault(t => t.Kind == TokenKind.Keyword_EndStruct);
+            if (endTok != null)
+            {
+                WriteLeadingTrivia(endTok);
+                _output.WriteIndent(_indent.CurrentIndent);
+                _output.WriteKeyword("END_STRUCT");
+                WriteTrailingTrivia(endTok);
+            }
+            else
+            {
+                _output.WriteIndent(_indent.CurrentIndent);
+                _output.WriteKeyword("END_STRUCT");
+            }
+            _output.WriteLine();
+        }
+
+        private void VisitEnumBody(EnumBody node)
+        {
+            _output.WriteIndent(_indent.CurrentIndent);
+
+            // Enum bodies are frequently laid out one value per line. Reflowing
+            // them into a single `( a, b, c )` line loses the original layout and,
+            // worse, the per-token LeadingTrivia (newlines) interacts with the
+            // inline writer below producing blank-line drift and stray semicolons.
+            // When the original is multi-line, preserve it verbatim — the same
+            // "don't touch what you can't safely reformat" policy as TcBlack.
+            if (HasNewlineTrivia(node.Tokens))
+            {
+                WriteTokensVerbatim(node.Tokens);
+                _output.WriteLine();
+                return;
+            }
+
+            // Single-line enum: ( value1, value2, ... )
+            for (int i = 0; i < node.Tokens.Count; i++)
+            {
+                var tok = node.Tokens[i];
+                WriteLeadingTrivia(tok);
+
+                if (tok.Kind == TokenKind.LeftParen)
+                {
+                    _output.Write("(");
+                    continue;
+                }
+                if (tok.Kind == TokenKind.RightParen)
+                {
+                    _output.Write(")");
+                    continue;
+                }
+                if (tok.Kind == TokenKind.Comma)
+                {
+                    _output.Write(", ");
+                    continue;
+                }
+
+                // Write enum value or type token
+                WriteTokenFormatted(tok);
+            }
+
+            _output.WriteLine();
+        }
+
+        /// <summary>
+        /// True when any token carries a newline in its leading/trailing trivia,
+        /// meaning the construct spans multiple physical lines in the source.
+        /// </summary>
+        private static bool HasNewlineTrivia(System.Collections.Generic.IEnumerable<Token> tokens)
+        {
+            foreach (var tok in tokens)
+            {
+                foreach (var t in tok.LeadingTrivia)
+                    if (t.Kind == TriviaKind.NewLine) return true;
+                foreach (var t in tok.TrailingTrivia)
+                    if (t.Kind == TriviaKind.NewLine) return true;
+            }
+            return false;
+        }
+
+        private void VisitUnionBody(UnionBody node)
+        {
+            _output.WriteIndent(_indent.CurrentIndent);
+
+            // Write UNION keyword
+            if (node.Tokens.Count > 0)
+            {
+                WriteLeadingTrivia(node.Tokens[0]);
+                _output.WriteKeyword("UNION");
+            }
+            _output.WriteLine();
+
+            // Calculate alignment for union members
+            int maxNameLen = 0;
+            if (_options.AlignDeclarations)
+            {
+                foreach (var child in node.Children)
+                {
+                    if (child is VarDeclaration vd)
+                        maxNameLen = Math.Max(maxNameLen, (vd.Name ?? "").Length);
+                }
+            }
+
+            // Visit members
+            foreach (var child in node.Children)
+            {
+                if (child is VarDeclaration vd)
+                    VisitVarDeclaration(vd, maxNameLen);
+                else
+                    Visit(child);
+            }
+
+            // Write END_UNION
+            var endTok = node.Tokens.LastOrDefault(t => t.Kind == TokenKind.Keyword_EndUnion);
+            if (endTok != null)
+            {
+                WriteLeadingTrivia(endTok);
+                _output.WriteIndent(_indent.CurrentIndent);
+                _output.WriteKeyword("END_UNION");
+                WriteTrailingTrivia(endTok);
+            }
+            else
+            {
+                _output.WriteIndent(_indent.CurrentIndent);
+                _output.WriteKeyword("END_UNION");
+            }
+            _output.WriteLine();
+        }
+
+        #endregion
+
+        #region Namespace and Using
+
+        private void VisitNamespaceDeclaration(NamespaceDeclaration node)
+        {
+            _output.WriteIndent(_indent.CurrentIndent);
+
+            // Write NAMESPACE keyword and name
+            Token endNsToken = null;
+            bool wroteFirst = false;
+
+            foreach (var tok in node.Tokens)
+            {
+                if (tok.Kind == TokenKind.Keyword_EndNamespace)
+                {
+                    endNsToken = tok;
+                    break;
+                }
+
+                WriteLeadingTrivia(tok);
+
+                if (wroteFirst)
+                    _output.Write(" ");
+
+                if (IsKeyword(tok.Kind))
+                    _output.WriteKeyword(tok.Text);
+                else
+                    _output.Write(tok.Text);
+
+                wroteFirst = true;
+            }
+
+            _output.WriteLine();
+
+            // Visit body children
+            using (_indent.Push())
+            {
+                foreach (var child in node.Children)
+                    Visit(child);
+            }
+
+            // Blank lines before END_NAMESPACE
+            for (int i = 0; i < _options.BlankLinesBeforeEnd; i++)
+                _output.WriteLine();
+
+            // Write END_NAMESPACE
+            if (endNsToken != null)
+            {
+                WriteLeadingTrivia(endNsToken);
+                _output.WriteIndent(_indent.CurrentIndent);
+                _output.WriteKeyword("END_NAMESPACE");
+                WriteTrailingTrivia(endNsToken);
+            }
+            else
+            {
+                _output.WriteIndent(_indent.CurrentIndent);
+                _output.WriteKeyword("END_NAMESPACE");
+            }
+            _output.WriteLine();
+        }
+
+        private void VisitUsingDirective(UsingDirective node)
+        {
+            _output.WriteIndent(_indent.CurrentIndent);
+
+            // Write USING keyword
+            if (node.Tokens.Count > 0)
+            {
+                WriteLeadingTrivia(node.Tokens[0]);
+                _output.WriteKeyword("USING");
+                _output.Write(" ");
+            }
+
+            // Write namespace name
+            _output.Write(node.NamespaceName ?? "");
+
+            // Write semicolon
+            var semiToken = node.Tokens.LastOrDefault(t => t.Kind == TokenKind.Semicolon);
+            if (semiToken != null)
+            {
+                _output.Write(";");
+                WriteTrailingTrivia(semiToken);
+            }
+            else
+            {
+                _output.Write(";");
+            }
+
+            _output.WriteLine();
+        }
+
+        #endregion
+
+        #region Unknown Node
+
+        private void VisitUnknownNode(UnknownNode node)
+        {
+            if (node.Tokens.Count == 0 && node.Children.Count == 0)
+                return;
+
+            _output.WriteIndent(_indent.CurrentIndent);
+
+            // Opaque recovery: an UnknownNode holds raw tokens for a construct we do
+            // not understand. Emit them byte-for-byte (original text + original
+            // trivia) so unrecognized code is preserved exactly — the same policy
+            // TcBlack applies to lines it cannot confidently reformat.
+            WriteTokensVerbatim(node.Tokens);
+
+            // Visit any children
+            foreach (var child in node.Children)
+                Visit(child);
+
+            _output.WriteLine();
+        }
+
+        #endregion
+
+        #region Token Writing Helpers
+
+        /// <summary>
+        /// Writes a token with proper formatting (keywords uppercase, type case, etc.).
+        /// </summary>
+        private void WriteTokenFormatted(Token token)
+        {
+            if (IsKeyword(token.Kind))
+            {
+                _output.WriteKeyword(token.Text);
+            }
+            else if (token.Kind == TokenKind.StringLiteral || token.Kind == TokenKind.WStringLiteral)
+            {
+                _output.Write(token.Text); // Preserve strings exactly
+            }
+            else if (token.Kind == TokenKind.TypedLiteral)
+            {
+                _output.Write(token.Text); // Preserve typed literals
+            }
+            else if (token.Kind == TokenKind.Pragma)
+            {
+                _output.Write(token.Text); // Preserve pragmas exactly
+            }
+            else if (token.Kind == TokenKind.Identifier)
+            {
+                _output.Write(FormatTypeTokenText(token));
+            }
+            else
+            {
+                _output.Write(token.Text);
+            }
+        }
+
+        /// <summary>
+        /// Writes a type-position token applying TypeCase option.
+        /// </summary>
+        private void WriteTypeToken(Token token)
+        {
+            if (IsKeyword(token.Kind))
+            {
+                _output.WriteKeyword(token.Text);
+            }
+            else if (token.Kind == TokenKind.Identifier)
+            {
+                _output.Write(ApplyTypeCase(token.Text));
+            }
+            else
+            {
+                _output.Write(token.Text);
+            }
+        }
+
+        /// <summary>
+        /// Applies TypeCase option to a token's text.
+        /// </summary>
+        private string FormatTypeTokenText(Token token)
+        {
+            if (token.Kind == TokenKind.Identifier && StandardTypes.Contains(token.Text))
+                return ApplyTypeCase(token.Text);
+            return token.Text;
+        }
+
+        private string ApplyTypeCase(string text)
+        {
+            switch (_options.TypeCase)
+            {
+                case TypeCase.Upper: return text.ToUpperInvariant();
+                case TypeCase.Lower: return text.ToLowerInvariant();
+                default: return text;
+            }
+        }
+
+        #endregion
+
+        #region Trivia Handling
+
+        /// <summary>
+        /// Writes leading trivia (comments, newlines) before a token.
+        /// </summary>
+        private void WriteLeadingTrivia(Token token)
+        {
+            if (token.LeadingTrivia == null || token.LeadingTrivia.Count == 0)
+                return;
+
+            foreach (var trivia in token.LeadingTrivia)
+            {
+                switch (trivia.Kind)
+                {
+                    case TriviaKind.NewLine:
+                        // Skip newline if indent was just written or already at line start.
+                        // This prevents extra blank lines after WriteIndent calls.
+                        if (!_output.IsAtLineStart && !_output.IsIndentWritten)
+                            _output.WriteLine();
+                        break;
+                    case TriviaKind.SingleLineComment:
+                    case TriviaKind.MultiLineComment:
+                        if (_output.IsAtLineStart)
+                            _output.WriteIndent(_indent.CurrentIndent);
+                        _output.Write(trivia.Text);
+                        if (trivia.Kind == TriviaKind.SingleLineComment)
+                            _output.WriteLine();
+                        break;
+                    case TriviaKind.Whitespace:
+                        break;
+                }
+            }
+        }
+
+        /// <summary>
+        /// Writes trailing trivia (inline comments) after a token.
+        /// </summary>
+        private void WriteTrailingTrivia(Token token)
+        {
+            if (token.TrailingTrivia == null || token.TrailingTrivia.Count == 0)
+                return;
+
+            foreach (var trivia in token.TrailingTrivia)
+            {
+                switch (trivia.Kind)
+                {
+                    case TriviaKind.SingleLineComment:
+                        _output.Write(" ");
+                        _output.Write(trivia.Text);
+                        break;
+                    case TriviaKind.MultiLineComment:
+                        _output.Write(" ");
+                        _output.Write(trivia.Text);
+                        break;
+                    case TriviaKind.NewLine:
+                        // Skip newlines in trailing trivia - the explicit WriteLine()
+                        // calls in visit methods handle line endings. This prevents
+                        // duplicate blank lines from appearing in the output.
+                        break;
+                }
+            }
+        }
+
+        #endregion
+
+        #region Spacing Rules
+
+        /// <summary>
+        /// Determines if a space is needed before the current token.
+        /// </summary>
+        private static bool NeedsSpaceBefore(Token current, Token previous, FormatterOptions opts)
+        {
+            if (previous == null) return false;
+
+            // No space after left paren/bracket when ParenInnerSpacing is false
+            if (!opts.ParenInnerSpacing &&
+                (previous.Kind == TokenKind.LeftParen || previous.Kind == TokenKind.LeftBracket))
+                return false;
+
+            // No space before right paren/bracket when ParenInnerSpacing is false
+            if (!opts.ParenInnerSpacing &&
+                (current.Kind == TokenKind.RightParen || current.Kind == TokenKind.RightBracket))
+                return false;
+
+            // Comma spacing: no space before comma, space after
+            if (current.Kind == TokenKind.Comma)
+                return false;
+            if (previous.Kind == TokenKind.Comma)
+                return opts.CommaSpacing;
+
+            // No space before semicolon
+            if (current.Kind == TokenKind.Semicolon)
+                return false;
+
+            // No space around dot
+            if (current.Kind == TokenKind.Dot || previous.Kind == TokenKind.Dot)
+                return false;
+
+            // No space around caret (dereference)
+            if (current.Kind == TokenKind.Caret || previous.Kind == TokenKind.Caret)
+                return false;
+
+            // No space before ( when preceded by Identifier (function call): Func(args) not Func (args)
+            if (current.Kind == TokenKind.LeftParen && previous.Kind == TokenKind.Identifier)
+                return false;
+
+            // No space before [ when preceded by Identifier (array access): arr[0] not arr [0]
+            if (current.Kind == TokenKind.LeftBracket && previous.Kind == TokenKind.Identifier)
+                return false;
+
+            // No space before [ when preceded by RightBracket (multi-dimensional): arr[0][1]
+            if (current.Kind == TokenKind.LeftBracket && previous.Kind == TokenKind.RightBracket)
+                return false;
+
+            // OutputAssign (=>) gets operator spacing
+            if (current.Kind == TokenKind.OutputAssign || previous.Kind == TokenKind.OutputAssign)
+                return opts.OperatorSpacing;
+
+            // Operator spacing
+            if (opts.OperatorSpacing)
+            {
+                if (IsOperator(current.Kind) || IsOperator(previous.Kind))
+                    return true;
+            }
+
+            // Default: space between most tokens
+            return true;
+        }
+
+        private static bool IsOperator(TokenKind kind)
+        {
+            switch (kind)
+            {
+                case TokenKind.Plus:
+                case TokenKind.Minus:
+                case TokenKind.Star:
+                case TokenKind.Slash:
+                case TokenKind.StarStar:
+                case TokenKind.Assign:
+                case TokenKind.OutputAssign:
+                case TokenKind.RefAssign:
+                case TokenKind.Equal:
+                case TokenKind.NotEqual:
+                case TokenKind.LessThan:
+                case TokenKind.GreaterThan:
+                case TokenKind.LessEqual:
+                case TokenKind.GreaterEqual:
+                case TokenKind.Keyword_And:
+                case TokenKind.Keyword_Or:
+                case TokenKind.Keyword_Xor:
+                case TokenKind.Keyword_Not:
+                case TokenKind.Keyword_AndThen:
+                case TokenKind.Keyword_OrElse:
+                case TokenKind.Keyword_Mod:
+                case TokenKind.Keyword_Expt:
+                    return true;
+                default:
+                    return false;
+            }
+        }
+
+        #endregion
+
+        #region Utility
+
+        private static bool IsKeyword(TokenKind kind)
+        {
+            return kind >= TokenKind.Keyword_Program && kind <= TokenKind.Keyword_False;
+        }
+
+        private static bool IsEndKeyword(TokenKind kind)
+        {
+            return kind == TokenKind.Keyword_EndProgram ||
+                   kind == TokenKind.Keyword_EndFunction ||
+                   kind == TokenKind.Keyword_EndFunctionBlock ||
+                   kind == TokenKind.Keyword_EndInterface ||
+                   kind == TokenKind.Keyword_EndVar ||
+                   kind == TokenKind.Keyword_EndMethod ||
+                   kind == TokenKind.Keyword_EndProperty ||
+                   kind == TokenKind.Keyword_EndIf ||
+                   kind == TokenKind.Keyword_EndCase ||
+                   kind == TokenKind.Keyword_EndFor ||
+                   kind == TokenKind.Keyword_EndWhile ||
+                   kind == TokenKind.Keyword_EndRepeat ||
+                   kind == TokenKind.Keyword_EndType ||
+                   kind == TokenKind.Keyword_EndStruct ||
+                   kind == TokenKind.Keyword_EndUnion ||
+                   kind == TokenKind.Keyword_EndNamespace ||
+                   kind == TokenKind.Keyword_EndAction ||
+                   kind == TokenKind.Keyword_EndTransition;
+        }
+
+        /// <summary>
+        /// Removes trailing whitespace from each line.
+        /// </summary>
+        private string RemoveTrailingWhitespace(string text)
+        {
+            if (string.IsNullOrEmpty(text)) return text;
+
+            var sb = new System.Text.StringBuilder(text.Length);
+            var lines = text.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None);
+
+            for (int i = 0; i < lines.Length; i++)
+            {
+                sb.Append(lines[i].TrimEnd(' ', '\t'));
+                if (i < lines.Length - 1)
+                    sb.Append(_lineEnding);
+            }
+
+            return sb.ToString();
+        }
+
+        /// <summary>
+        /// Normalizes blank lines. The idempotent collapse (never keep more than one
+        /// blank line) always runs; when <see cref="FormatterOptions.KeepEmptyLines"/>
+        /// is false, all blank lines are removed on top of that (TcBlack's
+        /// removeEmptyLines behaviour). Both steps are deterministic fixed points.
+        /// </summary>
+        private string NormalizeBlankLines(string text)
+        {
+            if (string.IsNullOrEmpty(text)) return text;
+
+            // Step 1: collapse runs of blank lines to at most one (idempotent).
+            var lines = text.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None);
+            var collapsed = new System.Collections.Generic.List<string>();
+            int consecutiveEmpty = 0;
+            foreach (var line in lines)
+            {
+                bool empty = line.Trim(' ', '\t').Length == 0;
+                if (empty)
+                {
+                    consecutiveEmpty++;
+                    if (consecutiveEmpty > 1) continue; // drop extra blank line
+                }
+                else
+                {
+                    consecutiveEmpty = 0;
+                }
+                collapsed.Add(line);
+            }
+            text = string.Join(_lineEnding, collapsed);
+
+            // Step 2: when not keeping empty lines, remove every blank line.
+            if (!_options.KeepEmptyLines)
+            {
+                lines = text.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None);
+                var kept = new System.Collections.Generic.List<string>();
+                foreach (var line in lines)
+                {
+                    if (line.Trim(' ', '\t').Length == 0) continue;
+                    kept.Add(line);
+                }
+                text = string.Join(_lineEnding, kept);
+            }
+
+            return text;
+        }
+
+        #endregion
+    }
+}

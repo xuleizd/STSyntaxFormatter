@@ -1,0 +1,126 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4022.12">
+  <POU Name="CoeSettingControl2" Id="{46165dea-8fed-459d-95b5-01a0f0d6d27b}" SpecialFunc="None">
+    <Declaration><![CDATA[FUNCTION_BLOCK CoeSettingControl2
+
+
+VAR_INPUT
+
+masterNetId : T_AmsNetId;;
+
+slaveAdr    : UINT;;
+
+writeIndex  : UINT:=0;;
+
+settingData : CoeSettingData;;
+
+enable      : BOOL;;
+
+    END_VAR
+
+
+VAR_OUTPUT
+
+error : BOOL;;
+
+    END_VAR
+
+
+VAR
+
+rTrig         : R_TRIG;;
+
+state         : UINT:=0;;
+
+writeState    : UINT:=0;;
+
+writeIndexOld : UINT:=0;;
+
+data          : POINTERTOUINT;;
+
+writeCoe      : FB_EcCoeSdoWrite;;
+
+dataWrite     : UINT;;
+
+count         : UINT;;
+
+    END_VAR
+
+END_FUNCTION_BLOCK
+
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[END_PROGRAM
+
+IF NOT enable THEN
+
+error := FALSE;
+
+    END_IF
+
+
+rTrig (CLK := enable, Q = >);
+
+
+CASE writeState OF
+
+0:
+
+IF rTrig.Q THEN
+
+IF writeIndex > 0 AND writeIndex <= settingData.settingDataLength THEN
+
+writeState := 1;
+
+                END_IF
+
+            END_IF
+
+1:
+
+data := writeIndex;
+
+writeState := 2;
+
+2:
+
+writeCoe (
+bExecute := TRUE,
+ pSrcBuf := ADR (data),
+ sNetId := masterNetId,
+ nSlaveAddr := slaveAdr,
+ nIndex := settingData.index,
+ nSubIndex := settingData.subIndex,
+ cbBufLen := settingData.settingLength);
+
+IF NOT writeCoe.bBusy THEN
+
+writeState := 3;
+
+writeCoe (bExecute := FALSE);
+
+            END_IF
+
+3:
+
+IF NOT writeCoe.bBusy THEN
+
+IF writeCoe.bError THEN
+
+error := TRUE;
+
+                END_IF
+
+writeState := 0;
+
+            END_IF
+
+    END_CASE
+]]></ST>
+    </Implementation>
+    <LineIds Name="CoeSettingControl2">
+      <LineId Id="30" Count="35" />
+      <LineId Id="9" Count="0" />
+    </LineIds>
+  </POU>
+</TcPlcObject>

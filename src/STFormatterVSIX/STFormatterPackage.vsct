@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<CommandTable xmlns="http://schemas.microsoft.com/VisualStudio/2005-10-18/CommandTable" xmlns:xs="http://www.w3.org/2001/XMLSchema">
+
+  <Extern href="stdidcmd.h"/>
+  <Extern href="vsshlids.h"/>
+
+  <Commands package="guidSTFormatterPackage">
+    <Groups>
+      <Group guid="guidSTFormatterCmdSet" id="MyMenuGroup" priority="0x0100">
+        <Parent guid="guidSHLMainMenu" id="IDM_VS_CTXT_ITEMNODE"/>
+      </Group>
+    </Groups>
+
+    <Buttons>
+      <Button guid="guidSTFormatterCmdSet" id="FormatSTCommandId" priority="0x0100" type="Button">
+        <Parent guid="guidSTFormatterCmdSet" id="MyMenuGroup"/>
+        <CommandFlag>DynamicVisibility</CommandFlag>
+        <CommandFlag>DefaultInvisible</CommandFlag>
+        <Strings>
+          <ButtonText>Format ST Code</ButtonText>
+          <ToolTipText>Format the Structured Text code in the active document</ToolTipText>
+        </Strings>
+      </Button>
+    </Buttons>
+  </Commands>
+
+  <Symbols>
+    <GuidSymbol name="guidSTFormatterPackage" value="{b2e3c4d5-e6f7-8901-abcd-ef2345678901}" />
+    <GuidSymbol name="guidSTFormatterCmdSet" value="{a1b2c3d4-e5f6-7890-abcd-ef1234567890}">
+      <IDSymbol name="MyMenuGroup" value="0x1000" />
+      <IDSymbol name="FormatSTCommandId" value="0x0100" />
+    </GuidSymbol>
+    <GuidSymbol name="guidSHLMainMenu" value="{5e21e1a4-5b32-4f18-a8a8-6a0b5e5e2e97}" />
+  </Symbols>
+
+</CommandTable>

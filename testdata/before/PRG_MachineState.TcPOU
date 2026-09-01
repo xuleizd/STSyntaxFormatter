@@ -1,0 +1,710 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.15">
+  <POU Name="PRG_MachineState" Id="{e100342e-b7cd-4a83-8eda-80bcca64dc15}" SpecialFunc="None">
+    <Declaration><![CDATA[PROGRAM PRG_MachineState
+
+
+VAR
+
+    END_VAR
+
+END_PROGRAM
+
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[END_PROGRAM
+
+    // 急停触发
+
+
+ IF bTriggerAbortring
+ OR NOT gIO.bStop THEN
+ bTriggerAbortring := FALSE;
+
+gMachine.eMachineState := E_MachineState._ABORTING;
+
+END_IF
+
+    // 机台状态机管理
+ 
+
+ CASE gMachine.eMachineState OF
+    // 机台停止中
+ 
+
+ E_MachineState._ABORTING :
+ Act_Aborting ();
+
+
+    // 机台停止
+
+
+ E_MachineState._ABORTED :
+ Act_Aborted ();
+
+
+    // 清除错误
+
+
+ E_MachineState._CLEARING :
+ Act_Clearing ();
+
+
+    // 机台准备完成
+
+
+ E_MachineState._STOPPED :
+ Act_Stopped ();
+
+
+    // 等待机台完成回零动作
+
+
+ E_MachineState._RESETING :
+ Act_Reseting ();
+
+
+    // 机台空闲
+
+
+ E_MachineState._IDLE :
+ Act_Idle ();
+
+
+    //机台启动中
+
+
+ E_MachineState._STARTING :
+ Act_Starting ();
+
+
+    //机台功能执行
+
+
+ E_MachineState._EXECUTE :
+ Act_Execute ();
+
+
+    //功能执行完成
+
+
+ E_MachineState._COMPLETE :
+ Act_Complete ();
+
+END_CASE
+
+ gMachine.sActMachineState := TO_STRING (gMachine.eMachineState);
+]]></ST>
+    </Implementation>
+    <Action Name="Act_Aborted" Id="{7e2cd0bb-f792-4b59-a1fb-cffde974ced5}">
+      <Implementation>
+        <ST><![CDATA[END_PROGRAM
+
+    //给出停止命令后等待机台完全停止下来—>切换到停止状态
+
+
+
+
+
+ IF bTriggerClearError
+ AND gIO.bStop THEN
+ bTriggerClearError := FALSE;
+
+gMachine.eMachineState := E_MachineState._CLEARING;
+
+END_IF
+]]></ST>
+      </Implementation>
+    </Action>
+    <Action Name="Act_Aborting" Id="{23ffdda3-3841-49de-a3d3-9dc5d5ca0d3d}">
+      <Implementation>
+        <ST><![CDATA[END_PROGRAM
+
+    (*控制机台停机*)
+
+    // 电机停止
+
+
+ afbAxis [AxisXNum].xPowerEn := FALSE;
+
+afbAxis [AxisYNum].xPowerEn := FALSE;
+
+afbAxis [AxisZNum].xPowerEn := FALSE;
+
+afbAxis [AxisXNum].xStopExe := TRUE;
+
+afbAxis [AxisYNum].xStopExe := TRUE;
+
+afbAxis [AxisZNum].xStopExe := TRUE;
+
+
+    // 三色灯
+
+
+
+    // 按钮LED
+ 
+
+
+    // 错误报警信息
+ 
+
+
+    // 状态清除
+ 
+
+
+
+
+
+    //停止命令给出后，切换到停止中状态
+ 
+
+ IF TRUE THEN
+ gMachine.eMachineState := E_MachineState._ABORTED;
+
+END_IF
+]]></ST>
+      </Implementation>
+    </Action>
+    <Action Name="Act_Clearing" Id="{d3ab27c2-3162-44a6-b207-e93eddb7c426}">
+      <Implementation>
+        <ST><![CDATA[END_PROGRAM
+
+    //等待机台各项系统参数及状态恢复正常后—>自动切换到IDLE状态下
+
+
+ CASE iStepClearError OF
+ 0 :
+ afbAxis [AxisXNum].M_STOP (FALSE);
+
+afbAxis [AxisYNum].M_STOP (FALSE);
+
+afbAxis [AxisZNum].M_STOP (FALSE);
+
+iStepClearError := iStepClearError + 10;
+
+
+10 :
+ afbAxis [AxisXNum].M_Reset (FALSE);
+
+afbAxis [AxisYNum].M_Reset (FALSE);
+
+afbAxis [AxisZNum].M_Reset (FALSE);
+
+afbAxis [AxisXNum].M_Reset (TRUE);
+
+afbAxis [AxisYNum].M_Reset (TRUE);
+
+afbAxis [AxisZNum].M_Reset (TRUE);
+
+iStepClearError := iStepClearError + 10;
+
+
+20 :
+ IF NOT afbAxis [AxisXNum].bResetBusy
+ AND NOT afbAxis [AxisYNum].bResetBusy
+ AND NOT afbAxis [AxisZNum].bResetBusy THEN
+ afbAxis [AxisXNum].M_Reset (FALSE);
+
+afbAxis [AxisYNum].M_Reset (FALSE);
+
+afbAxis [AxisZNum].M_Reset (FALSE);
+
+iStepClearError := iStepClearError + 10;
+
+END_IF
+
+ 30 :
+ afbAxis [AxisXNum].M_Power (TRUE);
+
+afbAxis [AxisYNum].M_Power (TRUE);
+
+afbAxis [AxisZNum].M_Power (TRUE);
+
+iStepClearError := iStepClearError + 10;
+
+
+40 :
+ afbAxis [AxisXNum].M_Reset (FALSE);
+
+afbAxis [AxisYNum].M_Reset (FALSE);
+
+afbAxis [AxisZNum].M_Reset (FALSE);
+
+afbAxis [AxisXNum].M_Reset (TRUE);
+
+afbAxis [AxisYNum].M_Reset (TRUE);
+
+afbAxis [AxisZNum].M_Reset (TRUE);
+
+iStepClearError := iStepClearError + 10;
+
+
+50 :
+ IF NOT afbAxis [AxisXNum].bResetBusy
+ AND NOT afbAxis [AxisYNum].bResetBusy
+ AND NOT afbAxis [AxisZNum].bResetBusy THEN
+ afbAxis [AxisXNum].M_Reset (FALSE);
+
+afbAxis [AxisYNum].M_Reset (FALSE);
+
+afbAxis [AxisZNum].M_Reset (FALSE);
+
+iStepClearError := iStepClearError + 10;
+
+END_IF
+
+ 60 :
+ IF afbAxis [AxisXNum].bPowerON
+ AND afbAxis [AxisYNum].bPowerON
+ AND afbAxis [AxisZNum].bPowerON THEN
+ gMachine.eMachineState := E_MachineState._STOPPED;
+
+iStepClearError := 0;
+
+ELSIF afbAxis [AxisXNum].bPowerError
+ OR afbAxis [AxisYNum].bPowerError
+ OR afbAxis [AxisZNum].bPowerError
+ OR afbAxis [AxisXNum].bAxisError
+ OR afbAxis [AxisYNum].bAxisError
+ OR afbAxis [AxisZNum].bAxisError THEN
+ gMachine.eMachineState := E_MachineState._ABORTING;
+
+iStepClearError := 0;
+
+END_IF
+
+END_CASE
+]]></ST>
+      </Implementation>
+    </Action>
+    <Action Name="Act_Complete" Id="{1a4e7a8f-4d1f-4551-be73-d9e3a2898aa8}">
+      <Implementation>
+        <ST><![CDATA[END_PROGRAM
+
+    //当前设定的机台动作执行完成—>返回到Idle状态下—>等待下一次的动作执行启动
+
+
+
+ gMachine.eMachineState := E_MachineState._IDLE;
+]]></ST>
+      </Implementation>
+    </Action>
+    <Action Name="Act_Execute" Id="{fe5d72d6-cf2d-4418-a8c5-d3399af865cb}">
+      <Implementation>
+        <ST><![CDATA[END_PROGRAM
+
+    //机台动作执行中—>根据设定的工作情景自行切换到完成或者再次执行
+
+
+
+    // 启动到首行开始位置与Z轴加工位置
+ 
+
+ bTriggerGoPreparingPos := gIO.bStart AND NOT bFirstRowArrived;
+
+
+    // 启动流程
+
+
+ IF gIO.bStart
+ AND bFirstRowArrived THEN
+ bTriggerStartSingleRow := TRUE;
+
+END_IF
+
+    // 流程完成
+ 
+
+ IF stProcessingDataInuse.udiCurrentRow >= stProcessingDataInuse.udiTotalRows THEN
+ bFirstRowArrived := FALSE;
+
+gMachine.eMachineState := E_MachineState._COMPLETE;
+
+END_IF
+]]></ST>
+      </Implementation>
+    </Action>
+    <Action Name="Act_Idle" Id="{fb3d47c8-a228-4e0d-8276-b34b57ae694d}">
+      <Implementation>
+        <ST><![CDATA[END_PROGRAM
+
+    //在此模式下可以进行手动功能验证测试等动作—>需要外部信号进行状态机切换才能切换到其他机台状态
+
+
+
+
+    // 启动条件
+ 
+
+ IF bTriggerStart THEN
+ bTriggerStart := FALSE;
+
+gMachine.eMachineState := E_MachineState._STARTING;
+
+END_IF
+]]></ST>
+      </Implementation>
+    </Action>
+    <Action Name="Act_Reseting" Id="{4a93709d-d2e9-4c31-b804-4b55ce3cf617}">
+      <Implementation>
+        <ST><![CDATA[END_PROGRAM
+
+CASE HomeStep OF
+
+        // Z轴找极限
+
+
+0:
+
+mcStepLimitSwitchZ (Axis := aAxis [AxisZNum], Parameter := mcHomingParameter, Execute := FALSE);
+
+mcStepLimitSwitchZ (Axis := aAxis [AxisZNum], Parameter := mcHomingParameter, Execute := TRUE);
+
+HomeStep := HomeStep + 10;
+
+
+10:
+
+IF NOT mcStepLimitSwitchZ.Busy THEN
+
+IF mcStepLimitSwitchZ.Done THEN
+
+HomeStep := HomeStep + 10;
+
+ELSE
+
+HomeStep := 999;
+
+                END_IF
+
+mcStepLimitSwitchZ (Axis := aAxis [AxisZNum], Parameter := mcHomingParameter, Execute := FALSE);
+
+            END_IF
+
+
+            // Z轴找参考点
+
+
+ 20 :
+ mcStepReferenceZ (Axis := aAxis [AxisZNum], Parameter := mcHomingParameter, Execute := FALSE);
+
+mcStepReferenceZ (Axis := aAxis [AxisZNum], Parameter := mcHomingParameter, Execute := TRUE);
+
+HomeStep := HomeStep + 10;
+
+
+30:
+
+IF NOT mcStepReferenceZ.Busy THEN
+
+IF mcStepReferenceZ.Done THEN
+
+HomeStep := HomeStep + 10;
+
+ELSE
+
+HomeStep := 999;
+
+                END_IF
+
+mcStepReferenceZ (Axis := aAxis [AxisZNum], Parameter := mcHomingParameter, Execute := FALSE);
+
+            END_IF
+
+
+            // Z轴完成回零
+
+
+ 40 :
+ mcFinishHomingZ (Axis := aAxis [AxisZNum], Parameter := mcHomingParameter, Execute := FALSE);
+
+mcFinishHomingZ (Axis := aAxis [AxisZNum], Parameter := mcHomingParameter, Execute := TRUE);
+
+HomeStep := HomeStep + 10;
+
+
+50:
+
+IF NOT mcFinishHomingZ.Busy THEN
+
+IF mcFinishHomingZ.Done THEN
+
+HomeStep := HomeStep + 10;
+
+ELSE
+
+HomeStep := 999;
+
+                END_IF
+
+mcFinishHomingZ (Axis := aAxis [AxisZNum], Parameter := mcHomingParameter, Execute := FALSE);
+
+            END_IF
+
+
+            // X、Y轴找极限
+
+
+ 60 :
+ mcStepLimitSwitchX (Axis := aAxis [AxisXNum], Parameter := mcHomingParameter, Execute := FALSE);
+
+mcStepLimitSwitchX (Axis := aAxis [AxisXNum], Parameter := mcHomingParameter, Execute := TRUE);
+
+mcStepLimitSwitchY (Axis := aAxis [AxisYNum], Parameter := mcHomingParameter, Execute := FALSE);
+
+mcStepLimitSwitchY (Axis := aAxis [AxisYNum], Parameter := mcHomingParameter, Execute := TRUE);
+
+HomeStep := HomeStep + 10;
+
+
+70:
+
+IF NOT mcStepLimitSwitchX.Busy
+ AND NOT mcStepLimitSwitchY.Busy THEN
+
+IF mcStepLimitSwitchX.Done
+ AND mcStepLimitSwitchY.Done THEN
+
+HomeStep := HomeStep + 10;
+
+ELSE
+
+HomeStep := 999;
+
+                END_IF
+
+mcStepLimitSwitchX (Axis := aAxis [AxisXNum], Parameter := mcHomingParameter, Execute := FALSE);
+
+mcStepLimitSwitchY (Axis := aAxis [AxisYNum], Parameter := mcHomingParameter, Execute := FALSE);
+
+            END_IF
+
+
+            // X、Y轴找参考点
+
+
+ 80 :
+ mcStepReferenceX (Axis := aAxis [AxisXNum], Parameter := mcHomingParameter, Execute := FALSE);
+
+mcStepReferenceX (Axis := aAxis [AxisXNum], Parameter := mcHomingParameter, Execute := TRUE);
+
+mcStepReferenceY (Axis := aAxis [AxisYNum], Parameter := mcHomingParameter, Execute := FALSE);
+
+mcStepReferenceY (Axis := aAxis [AxisYNum], Parameter := mcHomingParameter, Execute := TRUE);
+
+HomeStep := HomeStep + 10;
+
+
+90:
+
+IF NOT mcStepReferenceX.Busy
+ AND NOT mcStepReferenceY.Busy THEN
+
+IF mcStepReferenceX.Done
+ AND mcStepReferenceY.Done THEN
+
+HomeStep := HomeStep + 10;
+
+ELSE
+
+HomeStep := 999;
+
+                END_IF
+
+mcStepReferenceX (Axis := aAxis [AxisXNum], Parameter := mcHomingParameter, Execute := FALSE);
+
+mcStepReferenceY (Axis := aAxis [AxisYNum], Parameter := mcHomingParameter, Execute := FALSE);
+
+            END_IF
+
+
+            // X、Y轴完成回零
+
+
+ 100 :
+ mcFinishHomingX (Axis := aAxis [AxisXNum], Parameter := mcHomingParameter, Execute := FALSE);
+
+mcFinishHomingX (Axis := aAxis [AxisXNum], Parameter := mcHomingParameter, Execute := TRUE);
+
+mcFinishHomingY (Axis := aAxis [AxisYNum], Parameter := mcHomingParameter, Execute := FALSE);
+
+mcFinishHomingY (Axis := aAxis [AxisYNum], Parameter := mcHomingParameter, Execute := TRUE);
+
+HomeStep := HomeStep + 10;
+
+
+110:
+
+IF NOT mcFinishHomingX.Busy
+ AND NOT mcFinishHomingY.Busy THEN
+
+IF mcFinishHomingX.Done
+ AND mcFinishHomingY.Done THEN
+
+HomeStep := HomeStep + 10;
+
+ELSE
+
+; 
+
+
+                END_IF
+
+                //mcFinishHomingX(Axis:=aAxis[AxisXNum],Parameter:=mcHomingParameter,Execute:=FALSE);
+
+
+                //mcFinishHomingY(Axis:=aAxis[AxisYNum],Parameter:=mcHomingParameter,Execute:=FALSE);
+ 
+
+
+            END_IF
+
+
+            // X、Y、Z轴完成零点偏移
+
+
+ 120 :
+ mcSetOffsetHomePosX (Axis := aAxis [AxisXNum], Parameter := mcHomingParameter, Execute := FALSE);
+
+mcSetOffsetHomePosX (Axis := aAxis [AxisXNum], Parameter := mcHomingParameter, Execute := TRUE);
+
+mcSetOffsetHomePosY (Axis := aAxis [AxisYNum], Parameter := mcHomingParameter, Execute := FALSE);
+
+mcSetOffsetHomePosY (Axis := aAxis [AxisYNum], Parameter := mcHomingParameter, Execute := TRUE);
+
+mcSetOffsetHomePosZ (Axis := aAxis [AxisZNum], Parameter := mcHomingParameter, Execute := FALSE);
+
+mcSetOffsetHomePosZ (Axis := aAxis [AxisZNum], Parameter := mcHomingParameter, Execute := TRUE);
+
+HomeStep := HomeStep + 10;
+
+
+130:
+
+IF NOT mcSetOffsetHomePosX.Busy
+ AND NOT mcSetOffsetHomePosY.Busy
+ AND NOT mcSetOffsetHomePosZ.Busy THEN
+
+IF mcSetOffsetHomePosX.Done
+ AND mcSetOffsetHomePosY.Done
+ AND mcSetOffsetHomePosZ.Done THEN
+
+HomeStep := HomeStep + 10;
+
+ELSE
+
+HomeStep := 999;
+
+                END_IF
+
+mcSetOffsetHomePosX (Axis := aAxis [AxisXNum], Parameter := mcHomingParameter, Execute := FALSE);
+
+mcSetOffsetHomePosY (Axis := aAxis [AxisYNum], Parameter := mcHomingParameter, Execute := FALSE);
+
+mcSetOffsetHomePosZ (Axis := aAxis [AxisZNum], Parameter := mcHomingParameter, Execute := FALSE);
+
+            END_IF
+
+
+140:
+
+HomeStep := 0;
+
+gMachine.eMachineState := E_MachineState._IDLE;
+
+
+999:
+
+HomeStep := 0;
+
+gMachine.eMachineState := E_MachineState._ABORTING;
+
+    END_CASE
+]]></ST>
+      </Implementation>
+    </Action>
+    <Action Name="Act_Starting" Id="{8bf61906-16a4-4a3b-8002-fa4ba6b8d157}">
+      <Implementation>
+        <ST><![CDATA[END_PROGRAM
+
+    //加载并验证运行参数—>执行启动命令
+
+
+
+
+
+    // 记录此刻参数
+ 
+
+ IF gHMI.bViewDatasetOK
+ AND gHMI.bTargetAreaDatasetOK
+ AND gHMI.bProcessingDatasetOK THEN
+
+ bFirstRowArrived := FALSE;
+
+
+stProcessingDataInuse := stProcessingDataRealtime;
+
+stProcessingDatasetsInuse := gHMI.stProcessingDatasets;
+
+
+    // 速度信息
+
+
+ lrProcessingVeloXInuse := ghmi.lrProcessingVeloX;
+
+lrProcessingVeloYInuse := ghmi.lrProcessingVeloY;
+
+lrProcessingVeloZInuse := ghmi.lrProcessingVeloZ;
+
+    // 视场信息
+
+
+ lrViewWidthInUse := gHMI.lrViewWidth;
+
+lrViewHeightInUse := gHMI.lrViewHeight;
+
+    // 目标区域
+
+
+ lrTargetAreaWidthInUse := gHMI.lrTargetAreaWidth;
+
+lrTargetAreaHeightInUse := gHMI.lrTargetAreaHeight;
+
+lrTargetAreaCentralPointXInUse := gHMI.lrTargetAreaCentralPointX;
+
+lrTargetAreaCentralPointYInUse := gHMI.lrTargetAreaCentralPointY;
+
+
+gMachine.eMachineState := E_MachineState._EXECUTE;
+
+ELSE
+ gMachine.eMachineState := E_MachineState._IDLE;
+
+END_IF
+]]></ST>
+      </Implementation>
+    </Action>
+    <Action Name="Act_Stopped" Id="{fe54b6eb-4358-4102-898c-d3d5902c122c}">
+      <Implementation>
+        <ST><![CDATA[END_PROGRAM
+
+    //等待机台检修完成—>触发复位按钮后—>切换到复位执行状态
+
+
+
+
+
+ IF bTriggerReseting THEN
+ bTriggerReseting := FALSE;
+
+gMachine.eMachineState := E_MachineState._RESETING;
+
+END_IF
+]]></ST>
+      </Implementation>
+    </Action>
+  </POU>
+</TcPlcObject>

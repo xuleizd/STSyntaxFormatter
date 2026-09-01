@@ -1,0 +1,33 @@
+/* ST Syntax Formatter - VSIX Stylesheet */
+
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    margin: 0;
+    padding: 20px;
+    color: #333;
+}
+
+h1 {
+    font-size: 1.6em;
+    color: #007acc;
+    border-bottom: 2px solid #007acc;
+    padding-bottom: 8px;
+}
+
+h2 {
+    font-size: 1.2em;
+    color: #444;
+}
+
+p {
+    line-height: 1.6;
+}
+
+a {
+    color: #007acc;
+    text-decoration: none;
+}
+
+a:hover {
+    text-decoration: underline;
+}

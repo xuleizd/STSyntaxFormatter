@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.12">
+  <DUT Name="ST_ProcessingData" Id="{b5c9963d-6f9d-4526-a19b-374e5030d44b}">
+    <Declaration><![CDATA[TYPE ST_ProcessingData :
+    STRUCT
+    lrColFirstRowPosition           : LREAL;
+    lrColGapOfEachRow               : LREAL;
+    lrEvenRowStartPosition          : LREAL;
+    lrEvenRowInVeloPosition         : LREAL;
+    lrEvenRowTakePhotoPosition      : LREAL;
+    lrEvenRowStopPhotoPosition      : LREAL;
+    lrEvenRowEndConstantSpdPosition : LREAL;
+    lrEvenRowStopMovePosition       : LREAL;
+    lrOddRowStartPosition           : LREAL;
+    lrOddRowInVeloPosition          : LREAL;
+    lrOddRowTakePhotoPosition       : LREAL;
+    lrOddRowStopPhotoPosition       : LREAL;
+    lrOddRowEndConstantSpdPosition  : LREAL;
+    lrOddRowStopMovePosition        : LREAL;
+    udiTotalRows                    : UDINT;
+    udiCurrentRow                   : UDINT;
+    udiRemainingRows                : UDINT;
+    lrCompletePercentage            : LREAL;
+    bBusy                           : ,;
+    bError,
+ bDone ,
+ bPaused BOOL;
+    END_STRUCT
+END_TYPE
+
+]]></Declaration>
+  </DUT>
+</TcPlcObject>

@@ -1,0 +1,208 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Single xml:space="preserve" Type="{11f2245b-f54d-41e7-8df5-0dc5948f8965}" Method="IArchivable">
+  <Single Name="MetaObject" Type="{81297157-7ec9-45ce-845e-84cab2b88ade}" Method="IArchivable">
+    <Single Name="Guid" Type="System.Guid">eee6d41b-603b-4cde-a47a-011ea9d84d5c</Single>
+    <Single Name="ParentGuid" Type="System.Guid">f1c040c5-23df-4ada-a4cf-462fb9067c6c</Single>
+    <Single Name="Name" Type="string">MAIN</Single>
+    <Dictionary Type="{2c41fa04-1834-41c1-816e-303c7aa2c05b}" Name="Properties">
+      <Entry>
+        <Key>
+          <Single Type="System.Guid">829a18f2-c514-4f6e-9634-1df173429203</Single>
+        </Key>
+        <Value>
+          <Single Type="{829a18f2-c514-4f6e-9634-1df173429203}" Method="IArchivable">
+            <Dictionary Type="{fa2ee218-a39b-4b6d-b249-49dbddbd168a}" Name="ParentObjects">
+              <Entry>
+                <Key>
+                  <Single Type="System.Guid">d9b2b2cc-ea99-4c3b-aa42-1e5c49e65b84</Single>
+                </Key>
+                <Value>
+                  <Single Type="System.Guid">69d0cf79-1510-4e27-a080-869b93ec26b1</Single>
+                </Value>
+              </Entry>
+            </Dictionary>
+          </Single>
+        </Value>
+      </Entry>
+    </Dictionary>
+    <Single Name="TypeGuid" Type="System.Guid">6f9dac99-8de1-4efc-8465-68ac443b7d08</Single>
+    <Array Name="EmbeddedTypeGuids" Type="System.Guid">
+      <Single Type="System.Guid">a9ed5b7e-75c5-4651-af16-d2c27e98cb94</Single>
+      <Single Type="System.Guid">3b83b776-fb25-43b8-99f2-3c507c9143fc</Single>
+    </Array>
+    <Single Name="Timestamp" Type="long">634678456608453600</Single>
+  </Single>
+  <Single Name="Object" Type="{6f9dac99-8de1-4efc-8465-68ac443b7d08}" Method="IArchivable">
+    <Single Name="Implementation" Type="{3b83b776-fb25-43b8-99f2-3c507c9143fc}" Method="IArchivable">
+      <Single Name="TextDocument" Type="{f3878285-8e4f-490b-bb1b-9acbb7eb04db}" Method="IArchivable">
+        <Array Name="TextLines" Type="{a5de0b0b-1cb5-4913-ac21-9d70293ec00d}">
+          <Single Type="{a5de0b0b-1cb5-4913-ac21-9d70293ec00d}" Method="IArchivable">
+            <Single Name="Id" Type="long">56</Single>
+            <Null Name="Tag" />
+            <Single Name="Text" Type="string">END_PROGRAM</Single>
+          </Single>
+          <Single Type="{a5de0b0b-1cb5-4913-ac21-9d70293ec00d}" Method="IArchivable">
+            <Single Name="Id" Type="long">67</Single>
+            <Null Name="Tag" />
+            <Single Name="Text" Type="string"></Single>
+          </Single>
+          <Single Type="{a5de0b0b-1cb5-4913-ac21-9d70293ec00d}" Method="IArchivable">
+            <Single Name="Id" Type="long">66</Single>
+            <Null Name="Tag" />
+            <Single Name="Text" Type="string">IF bfirstCycle THEN</Single>
+          </Single>
+          <Single Type="{a5de0b0b-1cb5-4913-ac21-9d70293ec00d}" Method="IArchivable">
+            <Single Name="Id" Type="long">59</Single>
+            <Null Name="Tag" />
+            <Single Name="Text" Type="string">        (*第一个时钟周期，进行赋值，理想温度是38. *)</Single>
+          </Single>
+          <Single Type="{a5de0b0b-1cb5-4913-ac21-9d70293ec00d}" Method="IArchivable">
+            <Single Name="Id" Type="long">60</Single>
+            <Null Name="Tag" />
+            <Single Name="Text" Type="string">iTempfeedback := iTempSollValue;</Single>
+          </Single>
+          <Single Type="{a5de0b0b-1cb5-4913-ac21-9d70293ec00d}" Method="IArchivable">
+            <Single Name="Id" Type="long">62</Single>
+            <Null Name="Tag" />
+            <Single Name="Text" Type="string"></Single>
+          </Single>
+          <Single Type="{a5de0b0b-1cb5-4913-ac21-9d70293ec00d}" Method="IArchivable">
+            <Single Name="Id" Type="long">63</Single>
+            <Null Name="Tag" />
+            <Single Name="Text" Type="string">rTempfeedback := INT_TO_REAL (iTempfeedback);</Single>
+          </Single>
+          <Single Type="{a5de0b0b-1cb5-4913-ac21-9d70293ec00d}" Method="IArchivable">
+            <Single Name="Id" Type="long">54</Single>
+            <Null Name="Tag" />
+            <Single Name="Text" Type="string"></Single>
+          </Single>
+          <Single Type="{a5de0b0b-1cb5-4913-ac21-9d70293ec00d}" Method="IArchivable">
+            <Single Name="Id" Type="long">55</Single>
+            <Null Name="Tag" />
+            <Single Name="Text" Type="string">rTempSollValue := INT_TO_REAL (iTempSollValue);</Single>
+          </Single>
+          <Single Type="{a5de0b0b-1cb5-4913-ac21-9d70293ec00d}" Method="IArchivable">
+            <Single Name="Id" Type="long">45</Single>
+            <Null Name="Tag" />
+            <Single Name="Text" Type="string"></Single>
+          </Single>
+          <Single Type="{a5de0b0b-1cb5-4913-ac21-9d70293ec00d}" Method="IArchivable">
+            <Single Name="Id" Type="long">46</Single>
+            <Null Name="Tag" />
+            <Single Name="Text" Type="string">bfirstCycle := FALSE;</Single>
+          </Single>
+          <Single Type="{a5de0b0b-1cb5-4913-ac21-9d70293ec00d}" Method="IArchivable">
+            <Single Name="Id" Type="long">48</Single>
+            <Null Name="Tag" />
+            <Single Name="Text" Type="string"></Single>
+          </Single>
+          <Single Type="{a5de0b0b-1cb5-4913-ac21-9d70293ec00d}" Method="IArchivable">
+            <Single Name="Id" Type="long">49</Single>
+            <Null Name="Tag" />
+            <Single Name="Text" Type="string">    END_IF</Single>
+          </Single>
+          <Single Type="{a5de0b0b-1cb5-4913-ac21-9d70293ec00d}" Method="IArchivable">
+            <Single Name="Id" Type="long">50</Single>
+            <Null Name="Tag" />
+            <Single Name="Text" Type="string"></Single>
+          </Single>
+          <Single Type="{a5de0b0b-1cb5-4913-ac21-9d70293ec00d}" Method="IArchivable">
+            <Single Name="Id" Type="long">51</Single>
+            <Null Name="Tag" />
+            <Single Name="Text" Type="string"></Single>
+          </Single>
+          <Single Type="{a5de0b0b-1cb5-4913-ac21-9d70293ec00d}" Method="IArchivable">
+            <Single Name="Id" Type="long">52</Single>
+            <Null Name="Tag" />
+            <Single Name="Text" Type="string"></Single>
+          </Single>
+          <Single Type="{a5de0b0b-1cb5-4913-ac21-9d70293ec00d}" Method="IArchivable">
+            <Single Name="Id" Type="long">53</Single>
+            <Null Name="Tag" />
+            <Single Name="Text" Type="string"></Single>
+          </Single>
+          <Single Type="{a5de0b0b-1cb5-4913-ac21-9d70293ec00d}" Method="IArchivable">
+            <Single Name="Id" Type="long">41</Single>
+            <Null Name="Tag" />
+            <Single Name="Text" Type="string">IF bMotor THEN</Single>
+          </Single>
+          <Single Type="{a5de0b0b-1cb5-4913-ac21-9d70293ec00d}" Method="IArchivable">
+            <Single Name="Id" Type="long">42</Single>
+            <Null Name="Tag" />
+            <Single Name="Text" Type="string">        (* 模拟状况：当马达启动，温度随之缓慢下降*)</Single>
+          </Single>
+          <Single Type="{a5de0b0b-1cb5-4913-ac21-9d70293ec00d}" Method="IArchivable">
+            <Single Name="Id" Type="long">43</Single>
+            <Null Name="Tag" />
+            <Single Name="Text" Type="string">rTempfeedback := rTempfeedback - 0.002;</Single>
+          </Single>
+          <Single Type="{a5de0b0b-1cb5-4913-ac21-9d70293ec00d}" Method="IArchivable">
+            <Single Name="Id" Type="long">5</Single>
+            <Null Name="Tag" />
+            <Single Name="Text" Type="string"></Single>
+          </Single>
+        <Single Type="{a5de0b0b-1cb5-4913-ac21-9d70293ec00d}" Method="IArchivable"><Single Name="Id" Type="long">68</Single><Null Name="Tag" /><Single Name="Text" Type="string"></Single></Single><Single Type="{a5de0b0b-1cb5-4913-ac21-9d70293ec00d}" Method="IArchivable"><Single Name="Id" Type="long">69</Single><Null Name="Tag" /><Single Name="Text" Type="string">ELSE</Single></Single><Single Type="{a5de0b0b-1cb5-4913-ac21-9d70293ec00d}" Method="IArchivable"><Single Name="Id" Type="long">70</Single><Null Name="Tag" /><Single Name="Text" Type="string"></Single></Single><Single Type="{a5de0b0b-1cb5-4913-ac21-9d70293ec00d}" Method="IArchivable"><Single Name="Id" Type="long">71</Single><Null Name="Tag" /><Single Name="Text" Type="string"></Single></Single><Single Type="{a5de0b0b-1cb5-4913-ac21-9d70293ec00d}" Method="IArchivable"><Single Name="Id" Type="long">72</Single><Null Name="Tag" /><Single Name="Text" Type="string">rTempfeedback := rTempfeedback + 0.003;</Single></Single><Single Type="{a5de0b0b-1cb5-4913-ac21-9d70293ec00d}" Method="IArchivable"><Single Name="Id" Type="long">73</Single><Null Name="Tag" /><Single Name="Text" Type="string">    (*模拟状况：当马达未启动，温度随之上升  *)</Single></Single><Single Type="{a5de0b0b-1cb5-4913-ac21-9d70293ec00d}" Method="IArchivable"><Single Name="Id" Type="long">74</Single><Null Name="Tag" /><Single Name="Text" Type="string"></Single></Single><Single Type="{a5de0b0b-1cb5-4913-ac21-9d70293ec00d}" Method="IArchivable"><Single Name="Id" Type="long">75</Single><Null Name="Tag" /><Single Name="Text" Type="string">    END_IF</Single></Single><Single Type="{a5de0b0b-1cb5-4913-ac21-9d70293ec00d}" Method="IArchivable"><Single Name="Id" Type="long">76</Single><Null Name="Tag" /><Single Name="Text" Type="string"></Single></Single><Single Type="{a5de0b0b-1cb5-4913-ac21-9d70293ec00d}" Method="IArchivable"><Single Name="Id" Type="long">77</Single><Null Name="Tag" /><Single Name="Text" Type="string"></Single></Single><Single Type="{a5de0b0b-1cb5-4913-ac21-9d70293ec00d}" Method="IArchivable"><Single Name="Id" Type="long">78</Single><Null Name="Tag" /><Single Name="Text" Type="string"></Single></Single><Single Type="{a5de0b0b-1cb5-4913-ac21-9d70293ec00d}" Method="IArchivable"><Single Name="Id" Type="long">79</Single><Null Name="Tag" /><Single Name="Text" Type="string">iTempfeedback := REAL_TO_INT (rTempfeedback);</Single></Single></Array>
+      </Single>
+    </Single>
+    <Single Name="Interface" Type="{a9ed5b7e-75c5-4651-af16-d2c27e98cb94}" Method="IArchivable">
+      <Single Name="TextDocument" Type="{f3878285-8e4f-490b-bb1b-9acbb7eb04db}" Method="IArchivable">
+        <Array Name="TextLines" Type="{a5de0b0b-1cb5-4913-ac21-9d70293ec00d}">
+          <Single Type="{a5de0b0b-1cb5-4913-ac21-9d70293ec00d}" Method="IArchivable">
+            <Single Name="Id" Type="long">2</Single>
+            <Null Name="Tag" />
+            <Single Name="Text" Type="string">PROGRAM MAIN</Single>
+          </Single>
+          <Single Type="{a5de0b0b-1cb5-4913-ac21-9d70293ec00d}" Method="IArchivable">
+            <Single Name="Id" Type="long">6</Single>
+            <Null Name="Tag" />
+            <Single Name="Text" Type="string"></Single>
+          </Single>
+          <Single Type="{a5de0b0b-1cb5-4913-ac21-9d70293ec00d}" Method="IArchivable">
+            <Single Name="Id" Type="long">8</Single>
+            <Null Name="Tag" />
+            <Single Name="Text" Type="string"></Single>
+          </Single>
+          <Single Type="{a5de0b0b-1cb5-4913-ac21-9d70293ec00d}" Method="IArchivable">
+            <Single Name="Id" Type="long">64</Single>
+            <Null Name="Tag" />
+            <Single Name="Text" Type="string">VAR : : :</Single>
+          </Single>
+          <Single Type="{a5de0b0b-1cb5-4913-ac21-9d70293ec00d}" Method="IArchivable">
+            <Single Name="Id" Type="long">65</Single>
+            <Null Name="Tag" />
+            <Single Name="Text" Type="string"></Single>
+          </Single>
+          <Single Type="{a5de0b0b-1cb5-4913-ac21-9d70293ec00d}" Method="IArchivable">
+            <Single Name="Id" Type="long">9</Single>
+            <Null Name="Tag" />
+            <Single Name="Text" Type="string">iTempSollValue AT %;</Single>
+          </Single>
+          <Single Type="{a5de0b0b-1cb5-4913-ac21-9d70293ec00d}" Method="IArchivable">
+            <Single Name="Id" Type="long">47</Single>
+            <Null Name="Tag" />
+            <Single Name="Text" Type="string">        Q*;</Single>
+          </Single>
+          <Single Type="{a5de0b0b-1cb5-4913-ac21-9d70293ec00d}" Method="IArchivable">
+            <Single Name="Id" Type="long">58</Single>
+            <Null Name="Tag" />
+            <Single Name="Text" Type="string">        INT38;;</Single>
+          </Single>
+          <Single Type="{a5de0b0b-1cb5-4913-ac21-9d70293ec00d}" Method="IArchivable">
+            <Single Name="Id" Type="long">4</Single>
+            <Null Name="Tag" />
+            <Single Name="Text" Type="string"></Single>
+          </Single>
+          <Single Type="{a5de0b0b-1cb5-4913-ac21-9d70293ec00d}" Method="IArchivable">
+            <Single Name="Id" Type="long">1</Single>
+            <Null Name="Tag" />
+            <Single Name="Text" Type="string">iTempfeedback AT %;</Single>
+          </Single>
+        <Single Type="{a5de0b0b-1cb5-4913-ac21-9d70293ec00d}" Method="IArchivable"><Single Name="Id" Type="long">66</Single><Null Name="Tag" /><Single Name="Text" Type="string">        Q*;</Single></Single><Single Type="{a5de0b0b-1cb5-4913-ac21-9d70293ec00d}" Method="IArchivable"><Single Name="Id" Type="long">67</Single><Null Name="Tag" /><Single Name="Text" Type="string">        INT;;</Single></Single><Single Type="{a5de0b0b-1cb5-4913-ac21-9d70293ec00d}" Method="IArchivable"><Single Name="Id" Type="long">68</Single><Null Name="Tag" /><Single Name="Text" Type="string"></Single></Single><Single Type="{a5de0b0b-1cb5-4913-ac21-9d70293ec00d}" Method="IArchivable"><Single Name="Id" Type="long">69</Single><Null Name="Tag" /><Single Name="Text" Type="string">rTempSollValue : REAL;;</Single></Single><Single Type="{a5de0b0b-1cb5-4913-ac21-9d70293ec00d}" Method="IArchivable"><Single Name="Id" Type="long">70</Single><Null Name="Tag" /><Single Name="Text" Type="string"></Single></Single><Single Type="{a5de0b0b-1cb5-4913-ac21-9d70293ec00d}" Method="IArchivable"><Single Name="Id" Type="long">71</Single><Null Name="Tag" /><Single Name="Text" Type="string">rTempfeedback  : REAL;;</Single></Single><Single Type="{a5de0b0b-1cb5-4913-ac21-9d70293ec00d}" Method="IArchivable"><Single Name="Id" Type="long">72</Single><Null Name="Tag" /><Single Name="Text" Type="string"></Single></Single><Single Type="{a5de0b0b-1cb5-4913-ac21-9d70293ec00d}" Method="IArchivable"><Single Name="Id" Type="long">73</Single><Null Name="Tag" /><Single Name="Text" Type="string">bMotor AT %;</Single></Single><Single Type="{a5de0b0b-1cb5-4913-ac21-9d70293ec00d}" Method="IArchivable"><Single Name="Id" Type="long">74</Single><Null Name="Tag" /><Single Name="Text" Type="string">        I*;</Single></Single><Single Type="{a5de0b0b-1cb5-4913-ac21-9d70293ec00d}" Method="IArchivable"><Single Name="Id" Type="long">75</Single><Null Name="Tag" /><Single Name="Text" Type="string">        BOOL;;</Single></Single><Single Type="{a5de0b0b-1cb5-4913-ac21-9d70293ec00d}" Method="IArchivable"><Single Name="Id" Type="long">76</Single><Null Name="Tag" /><Single Name="Text" Type="string"></Single></Single><Single Type="{a5de0b0b-1cb5-4913-ac21-9d70293ec00d}" Method="IArchivable"><Single Name="Id" Type="long">77</Single><Null Name="Tag" /><Single Name="Text" Type="string">bfirstCycle    : BOOL:=TRUE;;</Single></Single><Single Type="{a5de0b0b-1cb5-4913-ac21-9d70293ec00d}" Method="IArchivable"><Single Name="Id" Type="long">78</Single><Null Name="Tag" /><Single Name="Text" Type="string"></Single></Single><Single Type="{a5de0b0b-1cb5-4913-ac21-9d70293ec00d}" Method="IArchivable"><Single Name="Id" Type="long">79</Single><Null Name="Tag" /><Single Name="Text" Type="string">    END_VAR</Single></Single><Single Type="{a5de0b0b-1cb5-4913-ac21-9d70293ec00d}" Method="IArchivable"><Single Name="Id" Type="long">80</Single><Null Name="Tag" /><Single Name="Text" Type="string"></Single></Single><Single Type="{a5de0b0b-1cb5-4913-ac21-9d70293ec00d}" Method="IArchivable"><Single Name="Id" Type="long">81</Single><Null Name="Tag" /><Single Name="Text" Type="string">END_PROGRAM</Single></Single><Single Type="{a5de0b0b-1cb5-4913-ac21-9d70293ec00d}" Method="IArchivable"><Single Name="Id" Type="long">82</Single><Null Name="Tag" /><Single Name="Text" Type="string"></Single></Single></Array>
+      </Single>
+    </Single>
+    <Single Name="UniqueIdGenerator" Type="string">67</Single>
+    <Single Name="POULevel" Type="{8e575c5b-1d37-49c6-941b-5c0ec7874787}">Standard</Single>
+    <List Name="ChildObjectGuids" Type="System.Collections.ArrayList" />
+    <Single Name="AddAttributeSubsequent" Type="bool">False</Single>
+  </Single>
+</Single>

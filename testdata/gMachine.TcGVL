@@ -1,0 +1,273 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.12">
+  <GVL Name="gMachine" Id="{5e90d1d4-636c-48ae-8a36-169aeeafb621}">
+    <Declaration><![CDATA[//{attribute 'qualified_only'}
+
+
+
+  VAR_GLOBAL
+ eMachineState :
+
+
+E_MachineState;
+
+
+sActMachineState :
+
+
+STRING;
+
+
+// 掉电保持数据记录
+
+
+
+  fbWritePersistent :
+
+
+FB_WritePersistentData;
+
+
+bSetMachineStateInit :
+
+
+BOOL;
+
+
+stProcessingDataRealtime :
+
+
+ST_ProcessingData;
+
+
+// 加工使用参数
+
+
+ stProcessingDataInuse :
+
+
+ST_ProcessingData;
+
+
+bCalcSingleRowOK :
+
+
+BOOL;
+
+
+stProcessingDatasetsInuse :
+
+
+ST_ProcessingDatasets;
+
+
+// 速度信息
+
+
+
+  lrProcessingVeloXInuse :
+
+
+LREAL := 10;
+
+
+lrProcessingVeloYInuse :
+
+
+LREAL := 20;
+
+
+lrProcessingVeloZInuse :
+
+
+LREAL := 10;
+
+
+// 视场信息
+
+
+
+  lrViewWidthInUse :
+
+
+LREAL := 0.1920;
+
+
+lrViewHeightInUse :
+
+
+LREAL := 0.1536;
+
+
+bViewDatasetOKInUse :
+
+
+BOOL;
+
+
+// 目标区域
+
+
+
+  lrTargetAreaWidthInUse :
+
+
+LREAL := 10.000;
+
+
+lrTargetAreaHeightInUse :
+
+
+LREAL := 10.000;
+
+
+lrTargetAreaCentralPointXInUse :
+
+
+LREAL := 0.0000;
+
+
+lrTargetAreaCentralPointYInUse :
+
+
+LREAL := 0.0000;
+
+
+bTargetAreaDatasetOKInUse :
+
+
+BOOL;
+
+
+bFirstRowArrived :
+
+
+BOOL;
+
+
+// 至准备位
+
+
+ iStepGoPrepaingPos :
+
+
+INT;
+
+
+bTriggerGoPreparingPos :
+
+
+BOOL;
+
+
+stTargetRowData :
+
+
+ST_SingleRowData;
+
+
+// 单行动作情况
+
+
+
+  iStepSingleRowProcess :
+
+
+INT;
+
+
+bTriggerStartSingleRow :
+
+
+BOOL;
+
+
+bStartPhotoSignal :
+
+
+BOOL;
+
+
+bStopPhotoSignal :
+
+
+BOOL;
+
+
+// 状态机管理
+
+
+
+  bTriggerAbortring :
+
+
+BOOL;
+
+
+bTriggerClearError :
+
+
+BOOL;
+
+
+iStepClearError :
+
+
+INT;
+
+
+bTriggerReseting :
+
+
+BOOL;
+
+
+bTriggerStart :
+
+
+BOOL;
+
+
+bTriggerPause :
+
+
+BOOL;
+
+
+bProcessingState :
+
+
+BOOL;
+
+
+END_VAR
+ VAR_GLOBAL PERSISTENT
+ AxisZPos0 :
+
+
+LREAL;
+
+
+AxisZPos1 :
+
+
+LREAL;
+
+
+AxisXPos :
+
+
+LREAL;
+
+
+AxisYPos :
+
+
+LREAL;
+
+
+END_VAR
+
+]]></Declaration>
+  </GVL>
+</TcPlcObject>

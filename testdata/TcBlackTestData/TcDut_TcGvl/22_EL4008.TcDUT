@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.12">
+  <DUT Name="EL4008" Id="{1cce0cf6-afd1-42b5-97a2-fe572288497d}">
+    <Declaration><![CDATA[TYPE EL4008 :
+STRUCT
+    iOut1,
+    iOut2,
+    iOut3,
+    iOut4,
+    iOut5,
+    iOut6,
+    iOut7,
+    iOut8 AT AT%Q* : INT;
+    bWcState AT AT%I* : BOOL;
+    uiState AT AT%I* : UINT;
+END_STRUCT
+END_TYPE
+]]></Declaration>
+  </DUT>
+</TcPlcObject>

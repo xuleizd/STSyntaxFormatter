@@ -1,0 +1,24 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4022.12">
+  <DUT Name="LastTrippedData" Id="{bf3bc0e8-9601-4163-8ee5-ba2fa830eff5}">
+    <Declaration><![CDATA[{attribute 'pack_mode' := '0'}
+TYPE LastTrippedData :
+STRUCT
+	opMode:BYTE;
+	passProt:BYTE;
+	timestampType:BYTE;
+	nomCurr:BYTE;
+	characteristic:BYTE;
+	trippedReason:BYTE;
+	trippedTime:WORD;
+	current:WORD;
+	load:WORD;
+	maxCurrDragInd:WORD;
+	voltIn:WORD;
+	voltOut:WORD;
+	timestamp:LWORD;
+END_STRUCT
+END_TYPE
+]]></Declaration>
+  </DUT>
+</TcPlcObject>

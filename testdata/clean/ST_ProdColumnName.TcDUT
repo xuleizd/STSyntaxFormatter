@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.16">
+  <DUT Name="ST_ProdColumnName" Id="{761920a2-26c0-482d-97c7-883df8486a99}">
+    <Declaration><![CDATA[// 编辑数据表的列名
+
+
+
+  TYPE ST_ProdColumnName :
+
+
+STRUCT
+ sColumn_0_Name :
+
+
+STRING := 'ID';
+
+
+sColumn_1_Name :
+
+
+STRING(50) := 'JS';
+
+
+sColumn_2_Name :
+
+
+STRING(50) := 'FTPBROWSE';
+
+
+sColumn_3_Name :
+
+
+STRING(50) := 'FTPDOWN';
+
+
+sColumn_4_Name :
+
+
+STRING(50) := 'DATAEXPORT';
+
+
+sColumn_5_Name :
+
+
+STRING(50) := 'DICTEDIT';
+
+
+sColumn_6_Name :
+
+
+STRING(50) := 'CREATETAB';
+
+
+END_STRUCT
+
+
+END_TYPE
+
+]]></Declaration>
+  </DUT>
+</TcPlcObject>

@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4022.12">
+  <DUT Name="SettingsData" Id="{4838603e-2d32-42d8-94b6-b8441dcc49a2}">
+    <Declaration><![CDATA[{attribute 'pack_mode' := '0'}
+TYPE SettingsData :
+STRUCT
+    nomCurr : BYTE;
+    character : BYTE;
+    currLvlWarn : WORD;
+    fuseInitState : BYTE;
+    inputFnc : BYTE;
+    overvoltBeha : BYTE;
+    undervoltLvl : BYTE;
+    reverseCurrFilt : BYTE;
+    switchProgCtrl : BYTE;
+    switchOnChannelDelay : WORD;
+END_STRUCT
+END_TYPE
+]]></Declaration>
+  </DUT>
+</TcPlcObject>

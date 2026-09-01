@@ -1,0 +1,42 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.12">
+  <POU Name="BFB_Trigger" Id="{2c50c032-f83a-43cf-aaac-4efc6fe4dc55}" SpecialFunc="None">
+    <Declaration><![CDATA[(*-----------------------------------------版本信息-----------------------------------------
+第一版本：		V1.0.0
+功能说明：		边缘触发功能块集合
+开发者：		Long.Yun
+开发时间：		2021.09.02
+
+变更版本：
+版本			变更者		变更时间		变更说明
+------------------------------------------------------------------------------------------*)
+{attribute 'hide_all_locals'}
+FUNCTION_BLOCK BFB_Trigger
+VAR_INPUT
+	//触发位
+	bIn			:BOOL;
+END_VAR
+
+VAR_OUTPUT
+	//边沿交替输出
+	bTrig		:BOOL;
+	//上升沿输出
+	bRiseTrig	:BOOL;
+	//下降沿输出
+	bFallTrig	:BOOL;
+END_VAR
+
+VAR
+	fbTrigR		:R_TRIG;
+	fbTrigF		:F_TRIG;
+END_VAR
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[fbTrigR(CLK := bIn, Q =>bRiseTrig);
+
+fbTrigF(CLK := bIn, Q => bFallTrig);
+
+bTrig := bRiseTrig OR bFallTrig;]]></ST>
+    </Implementation>
+  </POU>
+</TcPlcObject>

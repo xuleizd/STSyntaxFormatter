@@ -1,0 +1,163 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.16">
+  <POU Name="FB_QuerySQLServer" Id="{a9e280d1-9981-45d8-ae92-60c57245c537}" SpecialFunc="None">
+    <Declaration><![CDATA[FUNCTION_BLOCK FB_QuerySQLServer
+
+
+VAR_INPUT
+
+bExecute      : BOOL;;
+
+udiDBID       : UDINT;;
+
+sTableName    : STRING:='tbl_workflow005';;
+
+stTableSchema : ST_ProdColumnName;;
+
+sTargetCPID   : STRING:='6000';;
+
+    END_VAR
+
+
+VAR_OUTPUT ( 255 ) ;
+
+udiItemsCount : UDINT;;
+
+stQueryProd   : ST_ProdEntry;;
+
+bBusy,;
+
+bDone,;
+
+bError        : BOOL;;
+
+udiErrorID    : UDINT;;
+
+wsErrorText   : WSTRING;
+
+    END_VAR
+
+
+VAR . (
+
+iStep           : UDINT;;
+
+ipResultEvt     : Tc3_EventLogger;
+        I_TcResultEvent;;
+
+fbTrig_Exe      : R_TRIG;;
+
+fbSQLFormat     : FB_FormatString;;
+
+sSQLCmd         : T_MaxString;;
+
+fbPLCDBCmd      : FB_PLCDBCmd;
+        sNetID'',tTimeoutT#10S);;
+
+    END_VAR
+
+END_FUNCTION_BLOCK
+
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[END_PROGRAM
+
+fbTrig_Exe (CLK := bExecute);
+
+
+IF fbTrig_Exe.Q AND NOT bBusy THEN
+
+iStep := 10;
+
+    END_IF
+
+
+CASE iStep OF
+
+0:
+
+;
+            // 准备查询参数
+ 
+
+ 10 :
+ ipResultEvt := fbPLCDBCmd.ipTcResultEvent;
+
+            // select 选择要查询的列
+
+
+            // from 数据表
+ 
+
+            // where 筛选条件
+ 
+
+ sSQLCmd := 'SELECT %s, %s, %s, %s FROM dbo.%S WHERE ID = %s';
+
+fbSQLFormat (
+sFormat := sSQLCmd,
+ arg1 := F_STRINGEx (stTableSchema.sColumn_1_Name),
+ arg2 := F_STRINGEx (stTableSchema.sColumn_2_Name),
+ arg3 := F_STRINGEx (stTableSchema.sColumn_3_Name),
+ arg4 := F_STRINGEx (stTableSchema.sColumn_4_Name),
+ arg5 := F_STRINGEx (sTableName),
+ arg6 := F_STRINGEx (sTargetCPID),
+ arg7 :=,
+ sOut = > sSQLCmd);
+
+iStep := iStep + 10;
+
+            // 执行查询命令
+
+
+ 20 :
+ IF fbPLCDBCmd.ExecuteDataReturn (
+hDBID := udiDBID,
+ pExpression := ADR (sSQLCmd),
+ cbExpression := SIZEOF (sSQLCmd),
+ pData := 0,
+ cbData := 0,
+ pParameter := 0,
+ cbParameter := 0,
+ nStartIndex := 0,
+ nRecordCount := 1,
+ pReturnData := ADR (stQueryProd),
+ cbReturnData := SIZEOF (stQueryProd),
+ pRecords := ADR (udiItemsCount)) THEN
+ IF fbPLCDBCmd.bError THEN
+ iStep := 999;
+
+ELSE
+
+iStep := iStep + 10;
+
+END_IF
+
+END_IF
+
+ 30, 999 :
+ udiErrorID := ipResultEvt.EventId;
+
+wsErrorText := ipResultEvt.Text;
+
+IF NOT bExecute THEN
+
+iStep := 0;
+
+            END_IF
+
+    END_CASE
+
+bBusy := iStep >= 10 AND iStep < 30;
+
+bDone := iStep = 30;
+
+bError := iStep = 999;
+]]></ST>
+    </Implementation>
+    <LineIds Name="FB_QuerySQLServer">
+      <LineId Id="626" Count="58" />
+      <LineId Id="2" Count="0" />
+    </LineIds>
+  </POU>
+</TcPlcObject>

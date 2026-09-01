@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.12">
+  <DUT Name="ST_XYPos" Id="{79d14705-9756-4439-9490-3f7da75b58bd}">
+    <Declaration><![CDATA[TYPE ST_XYPos :
+    STRUCT
+    X : LREAL;
+    Y : LREAL;
+    END_STRUCT
+END_TYPE
+
+]]></Declaration>
+  </DUT>
+</TcPlcObject>

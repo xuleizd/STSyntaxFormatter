@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4022.6">
+  <DUT Name="LastModData" Id="{bb9f6ae4-0b06-472e-b203-78de3cf32c2a}">
+    <Declaration><![CDATA[{attribute 'pack_mode' := '0'}
+TYPE LastModData :
+STRUCT
+    opMode : BYTE;
+    passProt : BYTE;
+    timestampType : BYTE;
+    modType : BYTE;
+    nomCurrNew : BYTE;
+    nomCurrOld : BYTE;
+    charNew : BYTE;
+    charOld : BYTE;
+    currLvlWarnNew : WORD;
+    currLvlWarnOld : WORD;
+    manCharChangeInd : WORD;
+    manCharTimeValNew : WORD;
+    manCharTimeValOld : WORD;
+    timestamp : LWORD;
+END_STRUCT
+END_TYPE
+]]></Declaration>
+  </DUT>
+</TcPlcObject>

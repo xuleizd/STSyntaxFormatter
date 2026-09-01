@@ -1,0 +1,188 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.12">
+  <POU Name="_Auto" Id="{ada723d5-ec08-4e8a-bdb3-dd9b633799ea}" SpecialFunc="None">
+    <Declaration><![CDATA[PROGRAM _Auto
+    VAR
+        BOOL1 AT %MX0.0       : BOOL; //X轴平移判定变量
+
+
+BOOL2 AT %MX1.1     : BOOL; //Y轴换行变量
+
+
+fb_motion : FB_Motion;
+        RWafer      : LREAL := 10; //111		//晶圆半径
+
+
+A         : LREAL := 0.192; //111	//视像长,对应X轴
+
+
+B         : LREAL := 0.1536; //111	//视像宽,对应Y轴
+
+
+XDelta    : LREAL := 0.20; //111			//X相单次位移距离
+
+
+YDelta    : LREAL := 0.20; //111			//y相单次位移距离
+
+
+V_XDelta  : LREAL := 15; //111		//x相单次位移速度
+
+
+V_YDelta  : LREAL := 15; //111		//y相单次位移速度
+
+
+Xsum      : LREAL := XDelta; //x相总位移距离
+
+
+Ysum      : LREAL := YDelta; //y相总位移距离
+
+
+Ycount    : INT := 1; //y行
+
+
+
+itime    : INT;
+        iDEG        : INT; //21111
+
+
+Xpos      : LREAL;
+        Ypos        : LREAL;
+        ErrorID     : INT;
+        i           : INT;
+        XInitPos    : LREAL;
+        YInitPos    : LREAL;
+    END_VAR
+
+END_PROGRAM
+
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[    aAxis[AxisXNum].ReadStatus();
+    aAxis[AxisYNum].ReadStatus();
+    i := aStep;
+    CASE aStep OF
+        0:
+            IF Start THEN
+                Xsum := XDelta;
+                Ysum := YDelta;
+                Ycount := 1;
+                Xpos := 0;
+                Ypos := 0;
+                fb_motion.bAbsX := FALSE;
+                fb_motion.bAbsY := FALSE;
+                aStep := aStep + 10;
+            END_IF
+        10:
+            fb_motion.mcMoveabsX.Position := (COS(iDEG) * (EXPT (- 1, Ycount) * SQRT(EXPT (RWafer, 2) - EXPT (RWafer - (2 * Ycount - 1) * (B / 2), 2)))
+ - SIN(iDEG) * (RWafer - (Ycount - 1) * A)) + XInitPos;
+            (*(EXPT(-1,Ycount) * SQRT(EXPT(RWafer,2)-EXPT(RWafer-(2*Ycount-1)*(A/2),2)))*);
+            fb_motion.bAbsX := TRUE;
+            //fb_motion.mcMoveabsX.Velocity:=20;
+            //y轴找边缘
+fb_motion.mcMoveabsY.Position := (SIN(iDEG) * (EXPT (- 1, Ycount) * SQRT(EXPT (RWafer, 2) - EXPT (RWafer - (2 * Ycount - 1) * (B / 2), 2)))
+ + COS(iDEG) * (RWafer - (Ycount - 1) * A)) + YInitPos;
+            (*(RWafer-(Ycount-1)*A)*);
+            //fb_motion.mcMoveabsY.Velocity:=20;
+fb_motion.bAbsY := TRUE;
+            //fb_motion.mcMoveabsY.Execute:=TRUE;
+IF fb_motion.mcMoveabsY.Busy AND fb_motion.mcMoveabsX.Busy THEN
+                aStep := aStep + 10;
+                ELSIF aAxis[AxisXNum].Status.Error OR aAxis[AxisYNum].Status.Error THEN
+                    ErrorID := aStep;
+            //aStep := 999;
+            END_IF
+        20:
+            IF NOT fb_motion.mcMoveabsX.Busy AND NOT fb_motion.mcMoveabsY.Busy THEN
+                IF fb_motion.mcMoveabsX.Done AND fb_motion.mcMoveabsY.Done THEN
+                    aStep := aStep + 10;
+                    ELSE
+                        ErrorID := aStep;
+                //aStep := 999;
+                END_IF
+                fb_motion.bAbsX := FALSE;
+                fb_motion.bAbsY := FALSE;
+            END_IF
+        //21:
+        30:
+            fb_motion.mcMoveabsX.Position := COS(iDEG) * (EXPT (- 1, Ycount) * SQRT(EXPT (RWafer, 2) - EXPT (RWafer - (2 * Ycount - 1) * (B / 2), 2)) + EXPT (- 1, Ycount + 1) * Xsum)
+ - SIN(iDEG) * (RWafer - (Ycount - 1) * A);
+            (*EXPT(-1,Ycount) * SQRT(EXPT(RWafer,2)-EXPT(RWafer-(2*Ycount-1)*(B/2),2)) + EXPT(-1,Ycount+1)*Xsum;*)
+            //fb_motion.mcMoveabsX.Velocity:=V_XDelta;
+fb_motion.bAbsX := TRUE;
+            //fb_motion.mcMoveabsX.Execute:=TRUE;
+fb_motion.mcMoveabsY.Position := SIN(iDEG) * (EXPT (- 1, Ycount) * SQRT(EXPT (RWafer, 2) - EXPT (RWafer - (2 * Ycount - 1) * (B / 2), 2)) + EXPT (- 1, Ycount + 1) * Xsum)
+ + COS(iDEG) * (RWafer - (Ycount - 1) * A);
+            (*	-SIN(iDEG)*(EXPT(-1,Ycount) * SQRT(EXPT(RWafer,2)-EXPT(RWafer-(2*Ycount-1)*(B/2),2)) + EXPT(-1,Ycount+1)*Xsum)
+										+COS(iDEG)*(RWafer-(Ycount-1)*A);*)
+            (*(RWafer-(Ycount-1)*A)*);
+            //fb_motion.mcMoveabsY.Velocity:=V_YDelta;
+fb_motion.bAbsY := TRUE;
+            //fb_motion.mcMoveabsY.Execute:=TRUE;
+IF fb_motion.mcMoveabsX.Busy AND fb_motion.mcMoveabsX.Busy THEN
+                aStep := aStep + 10;
+                ELSIF aAxis[AxisXNum].Status.Error THEN
+                    ErrorID := aStep;
+            //aStep := 999;
+            END_IF
+        40:
+            IF NOT fb_motion.mcMoveabsX.Busy AND NOT fb_motion.mcMoveabsY.Busy THEN
+                IF fb_motion.mcMoveabsX.Done AND fb_motion.mcMoveabsY.Done THEN
+                    BOOL1 := TRUE;
+                    aStep := aStep + 10;
+                    ELSE
+                        ErrorID := aStep;
+                //aStep := 999;
+                END_IF
+                fb_motion.bAbsX := FALSE;
+                fb_motion.bAbsY := FALSE;
+            END_IF
+        50:
+            TON1(IN := NOT TON1.Q, PT := T#0MS, Q =>, ET =>);
+            IF Xsum < 2 * SQRT(EXPT (RWafer, 2) - EXPT (RWafer - (2 * Ycount - 1) * (B / 2), 2)) + XDelta AND TON1.q THEN
+                BOOL1 := FALSE;
+                Xsum := Xsum + XDelta;
+                aStep := 30;
+            END_IF
+            IF Xsum > (2 * SQRT(EXPT (RWafer, 2) - EXPT (RWafer - (2 * Ycount - 1) * (B / 2), 2)) + XDelta) THEN
+                BOOL1 := FALSE;
+                aStep := 60;
+            END_IF
+        60:
+            Ycount := Ycount + 1;
+            BOOL2 := FALSE;
+            IF Ycount * B < 2 * RWafer THEN
+                Xsum := XDelta;
+                aStep := 10;
+                ELSE
+                    Start := FALSE;
+                    aStep := 0;
+            END_IF
+    END_CASE
+    //Xpos:=COS(iDEG)*(EXPT(-1,Ycount) * SQRT(EXPT(RWafer,2)-EXPT(RWafer-(2*Ycount-1)*(B/2),2)) + EXPT(-1,Ycount+1)*Xsum)
+
+
+
+
+
+    //Ypos:=-SIN(iDEG)*(EXPT(-1,Ycount) * SQRT(EXPT(RWafer,2)-EXPT(RWafer-(2*Ycount-1)*(B/2),2)) + EXPT(-1,Ycount+1)*Xsum)
+
+
+    //		+COS(iDEG)*(RWafer-(Ycount-1)*A);
+
+
+    //Xpos:=2*SQRT(EXPT(RWafer,2)-EXPT(RWafer-(1+2*Ycount)*(B/2),2)) + XDelta;
+
+
+    IF Stop THEN
+        Stop := 0;
+        SysStep := 0;
+    END_IF
+    IF bAuto_Manual THEN
+        SysStep := 5;
+        aStep := 0;
+    END_IF
+//fb_motion();
+]]></ST>
+    </Implementation>
+  </POU>
+</TcPlcObject>

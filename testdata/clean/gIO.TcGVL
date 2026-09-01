@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.12">
+  <GVL Name="gIO" Id="{5e53a7e0-72e9-4356-bb0b-8232a589d583}">
+    <Declaration><![CDATA[{attribute 'qualified_only'}
+
+
+VAR_GLOBAL
+//按照模块顺序排列
+
+
+    Term2_1889 : EL1809;
+    Term3_2809 : EL2809;
+    Term6_1904 : EL1904;
+END_VAR
+
+VAR_GLOBAL
+// 输入
+
+
+//bAuto								:BOOL;// 自动状态
+
+
+//bManual							:BOOL;// 手动状态
+
+
+// 输出
+
+
+    bNlimitX       : BOOL; // 轴反向极限位置
+
+
+bNlimitY     : BOOL; // 轴反向极限位置
+
+
+bNlimitZ     : BOOL; // 轴反向极限位置
+
+
+
+bReady      : BOOL; // 蓝色按钮
+
+
+bAuto_Manual : BOOL; // 常闭-自动 常开-手动
+
+
+bStart       : BOOL; // 绿色按钮
+
+
+bStop        : BOOL; // 急停信号-常闭
+
+
+lightYellow  : BOOL;
+    lightGreen     : BOOL;
+    lightRed       : BOOL;
+END_VAR
+
+
+]]></Declaration>
+  </GVL>
+</TcPlcObject>

@@ -1,0 +1,87 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.16">
+  <POU Name="FB_ConnSQLServer" Id="{296c2cde-fedd-4964-8dc4-3db0c5a58334}" SpecialFunc="None">
+    <Declaration><![CDATA[FUNCTION_BLOCK FB_ConnSQLServer
+VAR_INPUT
+    bExecute : BOOL;
+    sServerIP : STRING := '192.168.77.250';
+    sDBName : STRING := 'n23052';
+    sUserName : STRING := 'xulei';
+    sPassword : STRING := 'twtddd1102';
+END_VAR
+VAR_OUTPUT
+    udiDBID : UDINT;
+    bBusy : BOOL;
+    bDone : BOOL;
+    bError : BOOL;
+    udiErrorID : UDINT;
+    wsErrorText : WSTRING(255);
+END_VAR
+VAR
+    fbTrig_Exe : R_TRIG;
+    iStep : UDINT;
+    _udiDBID : UDINT;
+    ipResultEvt : Tc3_EventLogger.I_TcResultEvent;
+    stDBConfig : T_DBConfig_Net_Mysql;
+    fbPLCDBConnect : FB_ConfigTcDBSrv(sNetID:='', tTimeout:=T#10S);
+    EventClassName : WSTRING(255);
+    EventSourcePath : STRING(255);
+END_VAR
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[// 连接到数据库
+fbTrig_Exe(CLK := bExecute);
+IF fbTrig_Exe.Q AND NOT bBusy THEN
+    iStep := 10;
+END_IF
+
+CASE iStep OF
+    0:
+        ;
+    // 数据库参数配置
+    10:
+        _udiDBID := 0;
+        stDBConfig.sServer := sServerIP;
+        stDBConfig.nPort := 3309;
+        stDBConfig.sDatabase := sDBName;
+        stDBConfig.bAuthentification := TRUE;
+        stDBConfig.sUserID := sUserName;
+        stDBConfig.sPassword := sPassword;
+        iStep := iStep + 10;
+    // 数据库连接配置
+    20:
+        IF fbPLCDBConnect.Create(pTcDBSrvConfig := ADR(stDBConfig), cbTcDBSrvConfig := SIZEOF(stDBConfig), bTemporary := TRUE, pConfigID := ADR(_udiDBID) ) THEN
+            ipResultEvt := fbPLCDBConnect.ipTcResultEvent;
+        // 数据库连接结果反馈
+            IF fbPLCDBConnect.bError
+            OR _udiDBID = 0
+            OR (ipResultEvt.Severity = E_Severity.Error)
+            OR (ipResultEvt.Severity = E_Severity.Critical) THEN
+            iStep := 999;
+        ELSE
+            udiDBID := _udiDBID;
+            iStep := iStep + 10;
+        END_IF
+    END_IF
+    
+    30,999:
+//		EventClassName := ipResultEvt.EventClassDisplayName;
+//		EventSourcePath := ipResultEvt.SourcePath;
+    udiErrorID := ipResultEvt.EventId;
+    wsErrorText := ipResultEvt.Text;
+    
+    IF NOT bExecute THEN
+        iStep := 0;
+    END_IF
+END_CASE
+bBusy := iStep >= 10 AND iStep < 30;
+bDone := iStep = 30;
+bError := iStep = 999;
+]]></ST>
+    </Implementation>
+    <LineIds Name="FB_ConnSQLServer">
+      <LineId Id="1423" Count="47" />
+      <LineId Id="2" Count="0" />
+    </LineIds>
+  </POU>
+</TcPlcObject>

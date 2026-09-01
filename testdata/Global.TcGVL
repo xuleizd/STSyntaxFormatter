@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4022.10">
+  <GVL Name="Global" Id="{f618b224-cca7-44ba-8dc9-39802f9c7956}">
+    <Declaration><![CDATA[VAR_GLOBAL
+    updateTime                 : TIME := T#100ms;
+    masterNetId                : T_AmsNetId; //	:='5.41.134.146.2.1';
+
+
+arrMasterNetId AT %I*           : ARRAY[0 .. 5] OF BYTE; //	:='5.41.134.146.2.1';
+
+
+localNetId               : T_AmsNetId := '192.168.173.1.1.1';
+    settingsCount              : UINT := 9;
+    settingArraySwitch         : ARRAY[1 .. 2] OF INT :=[0 , 1];
+    settingArrayCurrent        : ARRAY[1 .. 10] OF INT :=[1 , 2 , 3 , 4 , 5 , 6 , 7 , 8 , 9 , 10];
+    settingArrayCharacteristic : ARRAY[1 .. 4] OF INT :=[1 , 2 , 3 , 4];
+    settingArrayWarning        : ARRAY[1 .. 11] OF INT :=[50 , 55 , 60 , 65 , 70 , 75 , 80 , 85 , 90 , 95 , 100];
+    settingArrayFuseInit       : ARRAY[1 .. 3] OF INT :=[0 , 1 , 2];
+    settingArrayInputFnc       : ARRAY[1 .. 4] OF INT :=[0 , 1 , 2 , 3];
+    settingArrayUnderVoltLvl   : ARRAY[1 .. 4] OF INT :=[170 , 180 , 190 , 200];
+    settingArrayOverVoltBeha   : ARRAY[1 .. 2] OF INT :=[0 , 1];
+    settingArrayRevCurrFilt    : ARRAY[1 .. 3] OF INT :=[0 , 1 , 2];
+    settingsData               : ARRAY[1 .. 9] OF CoeSettingData :=[
+(index := 16#8000 , subIndex := 16#19 , settingData := ADR(settingArraySwitch) , settingDataLength := 2 , settingLength := 1) ,
+(index := 16#8000 , subIndex := 16#11 , settingData := ADR(settingArrayCurrent) , settingDataLength := 10 , settingLength := 1) ,
+(index := 16#8000 , subIndex := 16#12 , settingData := ADR(settingArrayCharacteristic) , settingDataLength := 4 , settingLength := 1) ,
+(index := 16#8000 , subIndex := 16#13 , settingData := ADR(settingArrayWarning) , settingDataLength := 100 , settingLength := 2) ,
+(index := 16#8000 , subIndex := 16#14 , settingData := ADR(settingArrayFuseInit) , settingDataLength := 3 , settingLength := 1) ,
+(index := 16#8000 , subIndex := 16#15 , settingData := ADR(settingArrayInputFnc) , settingDataLength := 4 , settingLength := 1) ,
+(index := 16#8000 , subIndex := 16#17 , settingData := ADR(settingArrayUnderVoltLvl) , settingDataLength := 240 , settingLength := 1) ,
+(index := 16#8000 , subIndex := 16#16 , settingData := ADR(settingArrayOverVoltBeha) , settingDataLength := 2 , settingLength := 1) ,
+(index := 16#8000 , subIndex := 16#18 , settingData := ADR(settingArrayRevCurrFilt) , settingDataLength := 3 , settingLength := 1)];
+END_VAR
+
+
+]]></Declaration>
+  </GVL>
+</TcPlcObject>

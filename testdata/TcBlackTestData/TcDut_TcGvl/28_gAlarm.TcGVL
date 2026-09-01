@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.12">
+  <GVL Name="gAlarm" Id="{cd8c748c-3e37-4c83-a58a-a1c3094c1b43}">
+    <Declaration><![CDATA[{attribute 'qualified_only'}
+]]></Declaration>
+  </GVL>
+</TcPlcObject>

@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.12">
+  <DUT Name="ST_ProcessingDatasets" Id="{ab9b9c4a-2ccc-4b43-8ff8-569b8c5273cf}">
+    <Declaration><![CDATA[TYPE ST_ProcessingDatasets :
+STRUCT
+    // 列
+    lrColFirstRowRedundancy : LREAL := 10; // 首行提前量%
+    lrColRowOverlap : LREAL := 0; // 前后行重叠量%
+    // 行
+    lrRowStartPositionDis : LREAL := 40.000; // 行开始位置与中心点间距
+    lrRowInVeloPositionDis : LREAL := 30.000; // 行到达匀速点与中心点间距
+    lrRowTriggerTakePhotoDis : LREAL := 10.000;
+    lrRowTriggerStopPhotoDis : LREAL := 10.000;
+    lrRowEndConstantSpdDis : LREAL := 25.000;
+    lrRowStopMoveDis : LREAL := 30.000;
+END_STRUCT
+END_TYPE
+]]></Declaration>
+  </DUT>
+</TcPlcObject>
