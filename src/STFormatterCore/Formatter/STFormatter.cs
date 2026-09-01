@@ -99,8 +99,7 @@ namespace STFormatterCore.Formatter
                 case UnknownNode n: VisitUnknownNode(n); break;
                 default:
                     // Fallback: visit children
-                    foreach (var child in node.Children)
-                        Visit(child);
+                    VisitStatementList(node.Children);
                     break;
             }
         }
@@ -157,24 +156,71 @@ namespace STFormatterCore.Formatter
         }
 
         /// <summary>
-        /// Writes the blank line that separates a statement block (IF/CASE/FOR/
-        /// WHILE/REPEAT) from the code above it. Suppressed only when nothing has
-        /// been written yet, so the document never starts with a blank line.
+        /// Visits the children of a POU/METHOD body with the same sibling separation
+        /// as <see cref="VisitStatementList"/> but indenting only statement children
+        /// (declaration-scope children stay at the header level).
         /// </summary>
-        private void WriteStatementBlockLeadingBlank()
+        private void VisitBodyChildren(System.Collections.Generic.IList<SyntaxNode> children)
         {
-            if (!_output.IsEmpty)
-                _output.WriteBlankLine();
+            for (int i = 0; i < children.Count; i++)
+            {
+                var child = children[i];
+                bool block = IsStatementBlock(child);
+                bool hasPrev = i > 0;
+                bool hasNext = i < children.Count - 1;
+                bool prevBlock = hasPrev && IsStatementBlock(children[i - 1]);
+
+                if (hasPrev && (block || prevBlock))
+                    _output.WriteBlankLine();
+
+                VisitBodyChild(child);
+
+                if (hasNext && block)
+                    _output.WriteBlankLine();
+            }
         }
 
         /// <summary>
-        /// Writes the blank line that separates a statement block from the code
-        /// below it. LineBuilder dedups consecutive blank lines, so two adjacent
-        /// blocks never produce more than one blank line between them.
+        /// True for the statement nodes that get a separating blank line around
+        /// them (IF/CASE/FOR/WHILE/REPEAT).
         /// </summary>
-        private void WriteStatementBlockTrailingBlank()
+        private static bool IsStatementBlock(SyntaxNode node)
         {
-            _output.WriteBlankLine();
+            return node is IfStatement ||
+                   node is CaseStatement ||
+                   node is ForStatement ||
+                   node is WhileStatement ||
+                   node is RepeatStatement;
+        }
+
+        /// <summary>
+        /// Visits a list of statement children, inserting the separating blank line
+        /// that belongs *between siblings*: a blank line is written immediately
+        /// before a statement block that has a previous sibling and immediately
+        /// after a statement block that has a following sibling. This yields
+        /// exactly one blank line between an IF/CASE/FOR/WHILE/REPEAT block and its
+        /// neighbours without ever putting a blank line before the parent's END
+        /// keyword (the last child) or right after the block's opening line (the
+        /// first child). LineBuilder dedups so two adjacent blocks share one blank.
+        /// </summary>
+        private void VisitStatementList(System.Collections.Generic.IList<SyntaxNode> children)
+        {
+            for (int i = 0; i < children.Count; i++)
+            {
+                var child = children[i];
+                bool block = IsStatementBlock(child);
+                bool hasPrev = i > 0;
+                bool hasNext = i < children.Count - 1;
+                bool prevBlock = hasPrev && IsStatementBlock(children[i - 1]);
+
+                if (hasPrev && (block || prevBlock))
+                    _output.WriteBlankLine();
+
+                Visit(child);
+
+                if (hasNext && block)
+                    _output.WriteBlankLine();
+            }
         }
 
         #endregion
@@ -241,8 +287,7 @@ namespace STFormatterCore.Formatter
             // declaration-scope children (VAR blocks and nested METHOD/PROPERTY/...)
             // stay at the same level as the POU header, matching TwinCAT's layout
             // where VAR belongs at column 0 directly under METHOD/PROGRAM.
-            foreach (var child in node.Children)
-                VisitBodyChild(child);
+            VisitBodyChildren(node.Children);
 
             // Blank lines before END
             for (int i = 0; i < _options.BlankLinesBeforeEnd; i++)
@@ -750,8 +795,7 @@ namespace STFormatterCore.Formatter
             // Visit body with the VAR blocks kept at the METHOD header's level
             // (TwinCAT layout: METHOD at column 0, VAR_INPUT / VAR_OUTPUT / VAR
             // directly under it, member declarations indented one level).
-            foreach (var child in node.Children)
-                VisitBodyChild(child);
+            VisitBodyChildren(node.Children);
 
             // Blank lines before END_METHOD
             for (int i = 0; i < _options.BlankLinesBeforeEnd; i++)
@@ -806,8 +850,7 @@ namespace STFormatterCore.Formatter
 
             // Visit GET/SET blocks at the PROPERTY header's level (TwinCAT layout:
             // PROPERTY at column 0, GET/SET directly under it, bodies indented).
-            foreach (var child in node.Children)
-                VisitBodyChild(child);
+            VisitBodyChildren(node.Children);
 
             // Blank lines before END_PROPERTY
             for (int i = 0; i < _options.BlankLinesBeforeEnd; i++)
@@ -843,8 +886,7 @@ namespace STFormatterCore.Formatter
             // Visit body
             using (_indent.Push())
             {
-                foreach (var child in node.Children)
-                    Visit(child);
+                VisitStatementList(node.Children);
             }
 
             // Write END_GET
@@ -876,8 +918,7 @@ namespace STFormatterCore.Formatter
             // Visit body
             using (_indent.Push())
             {
-                foreach (var child in node.Children)
-                    Visit(child);
+                VisitStatementList(node.Children);
             }
 
             // Write END_SET
@@ -900,8 +941,6 @@ namespace STFormatterCore.Formatter
 
         private void VisitIfStatement(IfStatement node)
         {
-            WriteStatementBlockLeadingBlank();
-
             string ifIndent = _indent.CurrentIndent;
             _output.WriteIndent(ifIndent);
 
@@ -944,23 +983,41 @@ namespace STFormatterCore.Formatter
             // ELSIF/ELSE/END_IF are written at the IF indent level (saved above).
             using (_indent.Push())
             {
-                foreach (var child in node.Children)
+                for (int i = 0; i < node.Children.Count; i++)
                 {
+                    var child = node.Children[i];
+                    bool block = IsStatementBlock(child);
+                    bool hasPrev = i > 0;
+                    bool hasNext = i < node.Children.Count - 1;
+                    bool prevBlock = hasPrev && IsStatementBlock(node.Children[i - 1]);
+
                     if (child is ElsifClause elsif)
                     {
                         // Write ELSIF at IF level (not body level)
                         _output.WriteIndent(ifIndent);
                         WriteElsifAtParentLevel(elsif);
+                        continue;
                     }
-                    else if (child is ElseClause elseClause)
+                    if (child is ElseClause elseClause)
                     {
                         // Write ELSE at IF level (not body level)
                         _output.WriteIndent(ifIndent);
                         WriteElseAtParentLevel(elseClause);
+                        continue;
                     }
-                    else
+
+                    if (hasPrev && (block || prevBlock))
+                        _output.WriteBlankLine();
+
+                    Visit(child);
+
+                    if (hasNext && block)
                     {
-                        Visit(child);
+                        // Only separate from a following regular statement, not from
+                        // a following ELSIF/ELSE clause (clauses stay attached).
+                        var next = node.Children[i + 1];
+                        if (!(next is ElsifClause) && !(next is ElseClause))
+                            _output.WriteBlankLine();
                     }
                 }
             }
@@ -981,7 +1038,6 @@ namespace STFormatterCore.Formatter
             }
             _output.WriteLine();
 
-            WriteStatementBlockTrailingBlank();
         }
 
         /// <summary>
@@ -1039,8 +1095,7 @@ namespace STFormatterCore.Formatter
             _output.WriteLine();
 
             // Body is at current indent level (already IF+1 from outer Push)
-            foreach (var child in node.Children)
-                Visit(child);
+            VisitStatementList(node.Children);
         }
 
         /// <summary>
@@ -1057,8 +1112,7 @@ namespace STFormatterCore.Formatter
             _output.WriteLine();
 
             // Body is at current indent level (already IF+1 from outer Push)
-            foreach (var child in node.Children)
-                Visit(child);
+            VisitStatementList(node.Children);
         }
 
         private void VisitElsifClause(ElsifClause node)
@@ -1097,8 +1151,7 @@ namespace STFormatterCore.Formatter
 
             using (_indent.Push())
             {
-                foreach (var child in node.Children)
-                    Visit(child);
+                VisitStatementList(node.Children);
             }
         }
 
@@ -1119,15 +1172,12 @@ namespace STFormatterCore.Formatter
 
             using (_indent.Push())
             {
-                foreach (var child in node.Children)
-                    Visit(child);
+                VisitStatementList(node.Children);
             }
         }
 
         private void VisitCaseStatement(CaseStatement node)
         {
-            WriteStatementBlockLeadingBlank();
-
             _output.WriteIndent(_indent.CurrentIndent);
 
             var selectorTokens = new List<Token>();
@@ -1169,8 +1219,7 @@ namespace STFormatterCore.Formatter
             // Visit branches with increased indent
             using (_indent.Push())
             {
-                foreach (var child in node.Children)
-                    Visit(child);
+                VisitStatementList(node.Children);
             }
 
             // Blank lines before END_CASE
@@ -1192,7 +1241,6 @@ namespace STFormatterCore.Formatter
             }
             _output.WriteLine();
 
-            WriteStatementBlockTrailingBlank();
         }
 
         private void VisitCaseBranch(CaseBranch node)
@@ -1252,15 +1300,12 @@ namespace STFormatterCore.Formatter
             // Visit body statements
             using (_indent.Push())
             {
-                foreach (var child in node.Children)
-                    Visit(child);
+                VisitStatementList(node.Children);
             }
         }
 
         private void VisitForStatement(ForStatement node)
         {
-            WriteStatementBlockLeadingBlank();
-
             _output.WriteIndent(_indent.CurrentIndent);
 
             var bodyTokens = new List<Token>();
@@ -1302,8 +1347,7 @@ namespace STFormatterCore.Formatter
 
             using (_indent.Push())
             {
-                foreach (var child in node.Children)
-                    Visit(child);
+                VisitStatementList(node.Children);
             }
 
             for (int i = 0; i < _options.BlankLinesBeforeEnd; i++)
@@ -1323,13 +1367,10 @@ namespace STFormatterCore.Formatter
             }
             _output.WriteLine();
 
-            WriteStatementBlockTrailingBlank();
         }
 
         private void VisitWhileStatement(WhileStatement node)
         {
-            WriteStatementBlockLeadingBlank();
-
             _output.WriteIndent(_indent.CurrentIndent);
 
             var condTokens = new List<Token>();
@@ -1370,8 +1411,7 @@ namespace STFormatterCore.Formatter
 
             using (_indent.Push())
             {
-                foreach (var child in node.Children)
-                    Visit(child);
+                VisitStatementList(node.Children);
             }
 
             for (int i = 0; i < _options.BlankLinesBeforeEnd; i++)
@@ -1391,13 +1431,10 @@ namespace STFormatterCore.Formatter
             }
             _output.WriteLine();
 
-            WriteStatementBlockTrailingBlank();
         }
 
         private void VisitRepeatStatement(RepeatStatement node)
         {
-            WriteStatementBlockLeadingBlank();
-
             _output.WriteIndent(_indent.CurrentIndent);
 
             Token untilToken = null;
@@ -1432,8 +1469,7 @@ namespace STFormatterCore.Formatter
 
             using (_indent.Push())
             {
-                foreach (var child in node.Children)
-                    Visit(child);
+                VisitStatementList(node.Children);
             }
 
             for (int i = 0; i < _options.BlankLinesBeforeEnd; i++)
@@ -1471,7 +1507,6 @@ namespace STFormatterCore.Formatter
             }
             _output.WriteLine();
 
-            WriteStatementBlockTrailingBlank();
         }
 
         #endregion
@@ -1698,8 +1733,7 @@ namespace STFormatterCore.Formatter
             // Visit body (STRUCT/ENUM/UNION)
             using (_indent.Push())
             {
-                foreach (var child in node.Children)
-                    Visit(child);
+                VisitStatementList(node.Children);
             }
 
             // Write the enum ';' after the body, before END_TYPE
@@ -1924,8 +1958,7 @@ namespace STFormatterCore.Formatter
             // Visit body children
             using (_indent.Push())
             {
-                foreach (var child in node.Children)
-                    Visit(child);
+                VisitStatementList(node.Children);
             }
 
             // Blank lines before END_NAMESPACE
@@ -1996,8 +2029,7 @@ namespace STFormatterCore.Formatter
             WriteTokensVerbatim(node.Tokens);
 
             // Visit any children
-            foreach (var child in node.Children)
-                Visit(child);
+            VisitStatementList(node.Children);
 
             _output.WriteLine();
         }

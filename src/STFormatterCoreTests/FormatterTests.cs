@@ -1074,6 +1074,46 @@ namespace STFormatterCoreTests
             Assert.True(whileLine - endVar == 2, "expected exactly one blank line between END_VAR and WHILE block");
         }
 
+        [Fact]
+        public void StatementBlocks_NoBlankBeforeEndKeywords_NestedBlocksClean()
+        {
+            var source =
+                "PROGRAM P\n" +
+                "IF a THEN\nx := 1;\nEND_IF\n" +
+                "CASE i OF\n" +
+                "0:\n" +
+                "    y := 2;\n" +
+                "    IF b THEN\n" +
+                "        IF c THEN\nz := 3;\nEND_IF\n" +
+                "        z := 4;\n" +
+                "    END_IF\n" +
+                "END_CASE\n" +
+                "END_PROGRAM";
+            var result = Format(source);
+            var lines = result.Split(new[] { "\r\n", "\n" }, System.StringSplitOptions.None);
+
+            // No blank line directly before any END keyword's final line (END_IF,
+            // END_CASE) inside blocks. The block-ending keyword must be immediately
+            // after the previous content line.
+            for (int i = 1; i < lines.Length; i++)
+            {
+                bool endKeyword = lines[i].Trim().Equals("END_IF") ||
+                                  lines[i].Trim().Equals("END_CASE");
+                if (endKeyword)
+                    Assert.False(lines[i - 1].Trim().Length == 0,
+                        $"blank line before {lines[i].Trim()} at line {i}");
+            }
+
+            // Exactly one blank line separates the two top-level blocks (END_IF → CASE).
+            int endIf = Array.FindIndex(lines, l => l.Trim() == "END_IF");
+            int caseLine = Array.FindIndex(lines, l => l.Trim().StartsWith("CASE i"));
+            Assert.True(endIf >= 0 && caseLine > endIf, "top-level IF/CASE not found");
+            int blankBetween = 0;
+            for (int i = endIf + 1; i < caseLine; i++)
+                if (lines[i].Trim().Length == 0) blankBetween++;
+            Assert.Equal(1, blankBetween);
+        }
+
         #endregion
 
         #region 50. TypeCase applies only to built-in types
