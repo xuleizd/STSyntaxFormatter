@@ -712,52 +712,88 @@ namespace STFormatterCore.Formatter
         }
 
         /// <summary>
-        /// Writes a node's tokens byte-for-byte, preserving every token's original
-        /// text and the original leading/trailing trivia (whitespace, newlines,
-        /// comments) exactly as it appeared in the source.
+        /// Writes a node's tokens preserving every token's original text and its
+        /// comments exactly as they appeared in the source. Line layout follows the
+        /// formatter's policies: continuation lines are re-indented at the current
+        /// level, and with KeepEmptyLines=false runs of source newlines collapse to
+        /// a single line break — but separate source lines are NEVER merged and
+        /// intra-line whitespace is NEVER dropped. Merging lines would let a '//'
+        /// comment swallow the code that follows it, and dropping spaces glues
+        /// tokens together until the code no longer compiles.
         /// </summary>
         private void WriteTokensVerbatim(System.Collections.Generic.IEnumerable<Token> tokens)
         {
-            foreach (var tok in tokens)
-            {
-                if (tok.LeadingTrivia != null)
-                {
-                    foreach (var trivia in tok.LeadingTrivia)
-                        WriteTriviaVerbatim(trivia);
-                }
-
-                _output.Write(tok.Text);
-
-                if (tok.TrailingTrivia != null)
-                {
-                    foreach (var trivia in tok.TrailingTrivia)
-                        WriteTriviaVerbatim(trivia);
-                }
-            }
+            WriteTokensVerbatim(tokens, null);
         }
 
         /// <summary>
-        /// Writes a single trivia element verbatim (whitespace, newline, comment).
+        /// Same as above, but the caller has already emitted one token and hands over
+        /// that token's trailing trivia so it is emitted in the correct position.
         /// </summary>
-        private void WriteTriviaVerbatim(Trivia trivia)
+        private void WriteTokensVerbatim(System.Collections.Generic.IEnumerable<Token> tokens,
+                                         System.Collections.Generic.List<Trivia> seedTrailingTrivia)
         {
-            switch (trivia.Kind)
+            // The caller has already emitted content when it hands over seed trivia.
+            bool emittedContent = seedTrailingTrivia != null;
+            int pendingNewlines = 0;
+
+            void Emit(Trivia trivia)
             {
-                case TriviaKind.Whitespace:
-                case TriviaKind.NewLine:
-                    // Structural whitespace/newlines are owned by the surrounding
-                    // visit methods. Reproducing them verbatim would leak the
-                    // source's blank-line layout into the formatted output and
-                    // bypass the KeepEmptyLines policy, so they are only preserved
-                    // when blank lines are being kept.
-                    if (_options.KeepEmptyLines)
+                switch (trivia.Kind)
+                {
+                    case TriviaKind.NewLine:
+                        pendingNewlines++;
+                        break;
+                    case TriviaKind.Whitespace:
+                        // Line-start whitespace is replaced by the indent written when
+                        // newlines are flushed; mid-line whitespace must stay or the
+                        // tokens on either side of it would be glued together.
+                        if (pendingNewlines == 0 && emittedContent)
+                            _output.Write(trivia.Text);
+                        break;
+                    case TriviaKind.SingleLineComment:
+                    case TriviaKind.MultiLineComment:
+                        FlushNewlines();
                         _output.Write(trivia.Text);
-                    break;
-                case TriviaKind.SingleLineComment:
-                case TriviaKind.MultiLineComment:
-                    _output.Write(trivia.Text);
-                    break;
+                        emittedContent = true;
+                        break;
+                }
             }
+
+            void FlushNewlines()
+            {
+                if (pendingNewlines == 0) return;
+                if (emittedContent)
+                {
+                    int count = _options.KeepEmptyLines ? pendingNewlines : 1;
+                    for (int i = 0; i < count; i++)
+                        _output.WriteLine();
+                    _output.WriteIndent(_indent.CurrentIndent);
+                }
+                pendingNewlines = 0;
+            }
+
+            if (seedTrailingTrivia != null)
+                foreach (var trivia in seedTrailingTrivia)
+                    Emit(trivia);
+
+            foreach (var tok in tokens)
+            {
+                if (tok.LeadingTrivia != null)
+                    foreach (var trivia in tok.LeadingTrivia)
+                        Emit(trivia);
+
+                FlushNewlines();
+                _output.Write(tok.Text);
+                emittedContent = true;
+
+                if (tok.TrailingTrivia != null)
+                    foreach (var trivia in tok.TrailingTrivia)
+                        Emit(trivia);
+            }
+
+            // Newlines pending after the last token are redundant: every caller
+            // terminates the construct with its own WriteLine().
         }
 
         #endregion
@@ -1520,16 +1556,20 @@ namespace STFormatterCore.Formatter
         {
             if (tokens.Count == 0) return;
 
-            // Multi-line function calls / assignments frequently carry inline
-            // trailing comments (e.g. "execute := x, // 中文注释") in the arg tokens'
-            // trailing trivia. Collapsing them onto one line would drop or garble
-            // those comments, so preserve the tokens + their trailing comments
-            // verbatim. LEADING trivia (newlines/blanks from the source layout) is
-            // deliberately NOT reproduced — the surrounding visit methods own the
-            // line breaks and the KeepEmptyLines policy.
-            if (HasInlineCommentTrivia(tokens))
+            // A comment that ends a source line BEFORE the statement is over makes
+            // reflow unsafe: collapsing the tokens would move later code behind the
+            // comment and silently comment it out. Such statements are preserved
+            // token-for-token — the same "don't touch what you can't safely
+            // reformat" policy as TcBlack. A comment on the FINAL token is safe:
+            // the normal path appends it via WriteTrailingTrivia.
+            if (HasMidStatementTrailingComment(tokens))
             {
-                WriteTokensVerbatim(tokens);
+                // The visit method already started the statement's line; run the
+                // first token's leading trivia through the normal policy so source
+                // line breaks do not duplicate into blank lines or reset the indent.
+                WriteLeadingTrivia(tokens[0]);
+                _output.Write(tokens[0].Text);
+                WriteTokensVerbatim(tokens.Skip(1), tokens[0].TrailingTrivia);
                 _output.WriteLine();
                 return;
             }
@@ -1544,19 +1584,24 @@ namespace STFormatterCore.Formatter
         }
 
         /// <summary>
-        /// True when any token carries an inline (same-line) comment in its TRAILING
-        /// trivia — a signal that the statement's layout must be kept verbatim.
+        /// True when a token that is NOT the last one carries a comment in its
+        /// trailing trivia — such a comment ends its source line mid-statement, so
+        /// reflowing the statement would pull later code behind the comment.
         /// Comments in LEADING trivia sit on their own line above the statement and
-        /// are handled by the normal reflow path (indent + KeepEmptyLines policy),
-        /// so they must NOT trigger the verbatim fallback: doing so would let source
-        /// blank lines and column-0 text leak through unformatted.
+        /// are handled by the normal reflow path (indent + KeepEmptyLines policy).
         /// </summary>
-        private static bool HasInlineCommentTrivia(List<Token> tokens)
+        private static bool HasMidStatementTrailingComment(List<Token> tokens)
         {
-            foreach (var tok in tokens)
+            for (int i = 0; i < tokens.Count - 1; i++)
             {
-                foreach (var t in tok.TrailingTrivia)
-                    if (t.Kind == TriviaKind.SingleLineComment) return true;
+                var trailing = tokens[i].TrailingTrivia;
+                if (trailing == null) continue;
+                foreach (var t in trailing)
+                {
+                    if (t.Kind == TriviaKind.SingleLineComment ||
+                        t.Kind == TriviaKind.MultiLineComment)
+                        return true;
+                }
             }
             return false;
         }

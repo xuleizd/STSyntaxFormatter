@@ -1,0 +1,458 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.16">
+  <POU Name="DBManager" Id="{a1b2c3d4-e5f6-7890-abcd-ef1234567890}" SpecialFunc="None">
+    <Declaration><![CDATA[FUNCTION_BLOCK DBManager
+VAR
+    // 数据库连接 ID
+    dbId : UDINT;
+    // 最后一次错误码
+    lastErrorID : UDINT;
+    lastErrorMsg : STRING;
+    // 各方法上升沿触发器
+    riseConnect : R_TRIG;
+    riseInsert : R_TRIG;
+    riseQuery : R_TRIG;
+    riseUpdate : R_TRIG;
+    
+    // 各方法独立状态步
+    stepConn : UDINT;
+    stepInsert : UDINT;
+    stepQuery : UDINT;
+    stepUpdate : UDINT;
+    
+    // 数据库连接功能块
+    dbConnect : FB_ConfigTcDBSrvEvt(sNetID:='', tTimeout:=T#5S);
+    // 各方法独立命令实例
+    cmdInsert : FB_PLCDBCmdEvt(sNetID:='', tTimeout:=T#5S);
+    cmdQuery : FB_PLCDBCmdEvt(sNetID:='', tTimeout:=T#5S);
+    cmdUpdate : FB_PLCDBCmdEvt(sNetID:='', tTimeout:=T#5S);
+END_VAR
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[]]></ST>
+    </Implementation>
+    <Method Name="Connect" Id="{b1000001-0000-0000-0000-000000000001}">
+      <Declaration><![CDATA[METHOD PUBLIC Connect : BOOL
+VAR_INPUT
+    execute : BOOL;
+    serverIP : STRING := '192.168.77.250';
+    dbName : STRING := 'n23052';
+    userName : STRING := 'xulei';
+    password : STRING := 'twtddd1102';
+END_VAR
+VAR_OUTPUT
+    errorID : UDINT;
+END_VAR
+VAR
+    dbConfig_mysql : T_DBConfig_Net_Mysql;
+    dbConfig_mssql : T_DBConfig_MsSQL;
+    ipResultEvt : I_TcMessage;
+    errorText : STRING;
+    resultSize : UDINT;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[riseConnect(CLK := execute);
+IF riseConnect.Q AND stepConn = 0 THEN
+    stepConn := 10;
+END_IF
+
+CASE stepConn OF
+    0:
+        Connect := FALSE;
+    10:
+        dbId := 0;
+        lastErrorID := 0;
+        lastErrorMsg := '';
+        IF(gvl.DBInfo.DBType) THEN
+            dbConfig_mssql.sServer := serverIP;
+            dbConfig_mssql.sProvider := 'SQLOLEDB';
+            dbConfig_mssql.sDatabase := dbName;
+            dbConfig_mssql.bAuthentification := TRUE;
+            dbConfig_mssql.sUserID := userName;
+            dbConfig_mssql.sPassword := password;
+            IF dbConnect.Create( pTcDBSrvConfig := ADR(dbConfig_mssql), cbTcDBSrvConfig := SIZEOF(dbConfig_mssql), bTemporary := TRUE, pConfigID := ADR(dbId)) THEN
+                IF dbConnect.bError THEN
+                    ipResultEvt := dbConnect.ipTcResult;
+                    lastErrorID := ipResultEvt.nEventId;
+                    ipResultEvt.RequestEventText( 1033, lastErrorMsg,  SIZEOF(lastErrorMsg) );
+                    stepConn := 999;
+                ELSE
+                    dBID := dbId;
+                    stepConn := 30;
+                END_IF
+            END_IF
+        ELSE
+            stepConn := 20;
+        END_IF
+    20:
+        dbConfig_mysql.sServer := serverIP;
+        dbConfig_mysql.nPort := 3306;
+        dbConfig_mysql.sDatabase := dbName;
+        dbConfig_mysql.bAuthentification := TRUE;
+        dbConfig_mysql.sUserID := userName;
+        dbConfig_mysql.sPassword := password;
+        IF dbConnect.Create( pTcDBSrvConfig := ADR(dbConfig_mysql), cbTcDBSrvConfig := SIZEOF(dbConfig_mysql), bTemporary := TRUE, pConfigID := ADR(dbId)) THEN
+            IF dbConnect.bError THEN
+                ipResultEvt := dbConnect.ipTcResult;
+                lastErrorID := ipResultEvt.nEventId;
+                ipResultEvt.RequestEventText( 1033, lastErrorMsg,  SIZEOF(lastErrorMsg) );
+                stepConn := 999;
+            ELSE
+                dBID := dbId;
+                stepConn := 30;
+            END_IF
+        END_IF
+    30, 999:
+        Connect := TRUE;
+        IF NOT execute THEN
+            stepConn := 0;
+        END_IF
+END_CASE
+
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Insert" Id="{b1000001-0000-0000-0000-000000000002}">
+      <Declaration><![CDATA[METHOD PUBLIC Insert : BOOL
+VAR_INPUT
+    execute : BOOL;
+    entry   : INSERTENTRY;
+END_VAR
+VAR_OUTPUT
+    done  : BOOL;
+    error : BOOL;
+END_VAR
+VAR
+    ipResultEvt : I_TCMESSAGE;
+    sqlCmd      : STRING( 200 );
+    para        : ARRAY[0 .. 5] OF ST_EXPPARAMETER; // 参数数组
+    resultSize  : UDINT;
+    len         : UINT;
+END_VAR
+
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[riseInsert(CLK := execute);
+
+IF riseInsert.Q AND stepInsert = 0 THEN
+    stepInsert := 10;
+
+END_IF
+
+CASE stepInsert OF
+    0:
+
+        Insert := FALSE;
+
+        error := FALSE;
+
+        done := FALSE;
+
+    10:
+
+        lastErrorID := 0;
+
+        lastErrorMsg := '';
+
+        stepInsert := 20;
+
+    20:
+
+        sqlCmd := 'INSERT INTO sys_userjs (JS, FTPBROWSE, FTPDOWN, DATAEXPORT, DICTEDIT, CREATETAB) VALUES ({JS}, {FTPBROWSE}, {FTPDOWN}, {DATAEXPORT}, {DICTEDIT}, {CREATETAB})';
+
+        len := SIZEOF(sqlCmd);
+
+    // 参数 0: JS (WSTRING 类型) —— 支持中文的关键
+        para[0].sParaName := 'JS';
+
+        para[0].eParaType := Tc3_Database.E_ExpParameterType.WSTRING_;
+
+        para[0].nParaSize := 50;// SIZEOF(entry.JS);
+
+    // 参数 1: FTPBROWSE (BOOL 类型)
+        para[1].sParaName := 'FTPBROWSE';
+
+        para[1].eParaType := Tc3_Database.E_ExpParameterType.Boolean;
+
+        para[1].nParaSize := SIZEOF(entry.FTPBROWSE);
+
+    // 参数 2: FTPDOWN (BOOL 类型)
+        para[2].sParaName := 'FTPDOWN';
+
+        para[2].eParaType := Tc3_Database.E_ExpParameterType.Boolean;
+
+        para[2].nParaSize := SIZEOF(entry.FTPDOWN);
+
+    // 参数 3: DATAEXPORT (BOOL 类型)
+        para[3].sParaName := 'DATAEXPORT';
+
+        para[3].eParaType := Tc3_Database.E_ExpParameterType.Boolean;
+
+        para[3].nParaSize := SIZEOF(entry.DATAEXPORT);
+
+    // 参数 4: DICTEDIT (BOOL 类型)
+        para[4].sParaName := 'DICTEDIT';
+
+        para[4].eParaType := Tc3_Database.E_ExpParameterType.Boolean;
+
+        para[4].nParaSize := SIZEOF(entry.DICTEDIT);
+
+    // 参数 5: CREATETAB (BOOL 类型)
+        para[5].sParaName := 'CREATETAB';
+
+        para[5].eParaType := Tc3_Database.E_ExpParameterType.Boolean;
+
+        para[5].nParaSize := SIZEOF(entry.CREATETAB);
+
+        IF cmdInsert.Execute(
+            hDBID := dbId,
+            pExpression := ADR(sqlCmd),
+            cbExpression := UINT_TO_UDINT(len) ,
+            pData := ADR(entry),
+            cbData := SIZEOF(entry),
+            pParameter := ADR(para),
+            cbParameter := SIZEOF(para)) THEN
+
+            IF cmdInsert.bError THEN
+                ipResultEvt := cmdInsert.ipTcResult;
+
+                lastErrorID := ipResultEvt.nEventId;
+
+                IF ipResultEvt.RequestEventText(nLangId := 1033, sResult := lastErrorMsg, nResultSize := SIZEOF(lastErrorMsg)) THEN
+                    stepInsert := 999;
+
+                    error := TRUE;
+
+                END_IF
+            ELSE
+                done := TRUE;
+
+                stepInsert := 30;
+
+            END_IF
+
+        END_IF
+    30, 999:
+
+        Insert := TRUE;
+
+        IF NOT execute THEN
+            stepInsert := 0;
+
+        END_IF
+
+END_CASE
+
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Query" Id="{b1000001-0000-0000-0000-000000000003}">
+      <Declaration><![CDATA[METHOD PUBLIC Query : BOOL
+VAR_INPUT
+    execute : BOOL;
+    tableName : STRING;
+    filterID : LINT;
+END_VAR
+VAR_OUTPUT
+    done : BOOL;
+    error : BOOL;
+    outResult : TableEntry;
+END_VAR
+VAR
+    para : ARRAY [0..0] OF ST_ExpParameter;
+    sqlCmd : T_MaxString;
+    ipResultEvt : I_TcMessage;
+    search : EntrySearch;
+    itemsCount : UDINT;
+    errorText : STRING;
+    resultSize : UDINT;
+END_VAR
+VAR_STAT
+    result : TableEntry;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[riseQuery(CLK := execute);
+IF riseQuery.Q AND stepQuery = 0 THEN
+    stepQuery := 10;
+END_IF
+
+CASE stepQuery OF
+    0:
+        Query := FALSE;
+        error := FALSE;
+        done := FALSE;
+    10:
+        lastErrorID := 0;
+        lastErrorMsg := '';
+        stepQuery := 20;
+    20:
+        sqlCmd := 'SELECT ID, JS, FTPBROWSE, FTPDOWN, DATAEXPORT, DICTEDIT, CREATETAB FROM sys_userjs WHERE ID = {ID}';
+        
+        search.ID := filterID; // 要查询的ID;
+        
+        para[0].sParaName := 'ID';
+        para[0].eParaType := Tc3_Database.E_ExpParameterType.Int64;  // LINT 对应 Int64
+        para[0].nParaSize := SIZEOF(search.ID);
+        
+        IF cmdQuery.ExecuteDataReturn(
+            hDBID := dbId,
+            pExpression := ADR(sqlCmd),
+            cbExpression := SIZEOF(sqlCmd),
+            pData := ADR(search),
+            cbData := SIZEOF(search),
+            pParameter := ADR(para),
+            cbParameter := SIZEOF(para),
+            nStartIndex := 0,
+            nRecordCount := 1,
+            pReturnData := ADR(result),
+            cbReturnData := SIZEOF(result),
+            pRecords := ADR(itemsCount)) THEN
+            IF cmdQuery.bError THEN
+                ipResultEvt := cmdInsert.ipTcResult;
+                lastErrorID := ipResultEvt.nEventId;
+                IF ipResultEvt.RequestEventText( 1033, lastErrorMsg, SIZEOF(lastErrorMsg) ) THEN
+                    stepQuery := 999;
+                    error := TRUE;
+                END_IF
+            ELSE
+                outResult := result;
+                done := TRUE;
+                stepQuery := 30;
+            END_IF
+        END_IF
+    30, 999:
+        Query := TRUE;
+        IF NOT execute THEN
+            stepQuery := 0;
+        END_IF
+END_CASE
+
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Update" Id="{b1000001-0000-0000-0000-000000000004}">
+      <Declaration><![CDATA[METHOD PUBLIC Update : BOOL
+VAR_INPUT
+    execute : BOOL;
+    tableName : STRING;
+    entry : TableEntry;
+END_VAR
+VAR_OUTPUT
+    done : BOOL;
+    error : BOOL;
+END_VAR
+VAR
+    ipResultEvt : I_TcMessage;
+    sqlCmd : STRING(200);
+    data : TableEntry;
+    para : ARRAY[0..6] OF ST_ExpParameter; // 参数数组
+    // errorText : STRING;
+    resultSize : UDINT;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[riseUpdate(CLK := execute);
+IF riseUpdate.Q AND stepUpdate = 0 THEN
+    stepUpdate := 10;
+END_IF
+
+CASE stepUpdate OF
+    0:
+        Update := FALSE;
+        error := FALSE;
+        done := FALSE;
+    10:
+        lastErrorID := 0;
+        lastErrorMsg := '';
+        
+        stepUpdate := 20;
+    20:
+        sqlCmd := 'UPDATE sys_userjs SET JS = {JS}, FTPBROWSE = {FTPBROWSE}, FTPDOWN = {FTPDOWN}, DATAEXPORT = {DATAEXPORT}, DICTEDIT = {DICTEDIT}, CREATETAB = {CREATETAB} WHERE ID = {ID}';
+        
+    // 参数 0: JS (WSTRING 类型)
+        para[1].sParaName := 'JS';
+        para[1].eParaType := Tc3_Database.E_ExpParameterType.WSTRING_;
+        para[1].nParaSize := SIZEOF(data.JS);
+        
+    // 参数 1: FTPBROWSE (BOOL 类型)
+        para[2].sParaName := 'FTPBROWSE';
+        para[2].eParaType := Tc3_Database.E_ExpParameterType.Boolean;
+        para[2].nParaSize := SIZEOF(data.FTPBROWSE);
+        
+    // 参数 2: FTPDOWN (BOOL 类型)
+        para[3].sParaName := 'FTPDOWN';
+        para[3].eParaType := Tc3_Database.E_ExpParameterType.Boolean;
+        para[3].nParaSize := SIZEOF(data.FTPDOWN);
+        
+    // 参数 3: DATAEXPORT (BOOL 类型)
+        para[4].sParaName := 'DATAEXPORT';
+        para[4].eParaType := Tc3_Database.E_ExpParameterType.Boolean;
+        para[4].nParaSize := SIZEOF(data.DATAEXPORT);
+        
+    // 参数 4: DICTEDIT (BOOL 类型)
+        para[5].sParaName := 'DICTEDIT';
+        para[5].eParaType := Tc3_Database.E_ExpParameterType.Boolean;
+        para[5].nParaSize := SIZEOF(data.DICTEDIT);
+        
+    // 参数 5: CREATETAB (BOOL 类型)
+        para[6].sParaName := 'CREATETAB';
+        para[6].eParaType := Tc3_Database.E_ExpParameterType.Boolean;
+        para[6].nParaSize := SIZEOF(data.CREATETAB);
+        
+    // 参数 6: ID (LINT 类型) —— WHERE 条件
+        para[0].sParaName := 'ID';
+        para[0].eParaType := Tc3_Database.E_ExpParameterType.Int64;
+        para[0].nParaSize := SIZEOF(data.ID);
+        IF cmdUpdate.Execute(
+            hDBID := dbId,
+            pExpression := ADR(sqlCmd),
+            cbExpression := SIZEOF(sqlCmd),
+            pData := ADR(entry),
+            cbData := SIZEOF(entry),
+            pParameter := ADR(para),
+            cbParameter := SIZEOF(para))THEN
+            IF cmdQuery.bError THEN
+                ipResultEvt := cmdQuery.ipTcResult;
+                lastErrorID := ipResultEvt.nEventId;
+                IF ipResultEvt.RequestEventText( 1033, lastErrorMsg, SIZEOF(lastErrorMsg) ) THEN
+                    stepUpdate := 999;
+                    error := TRUE;
+                END_IF
+            ELSE
+                done := TRUE;
+                stepUpdate := 30;
+            END_IF
+        END_IF
+    30, 999:
+        Update := TRUE;
+        IF NOT execute THEN
+            stepUpdate := 0;
+        END_IF
+END_CASE
+
+]]></ST>
+      </Implementation>
+    </Method>
+    <LineIds Name="DBManager">
+      <LineId Id="2" Count="0" />
+    </LineIds>
+    <LineIds Name="DBManager.Connect">
+      <LineId Id="3473" Count="57" />
+      <LineId Id="2" Count="0" />
+    </LineIds>
+    <LineIds Name="DBManager.Insert">
+      <LineId Id="10582" Count="110" />
+      <LineId Id="2" Count="0" />
+    </LineIds>
+    <LineIds Name="DBManager.Query">
+      <LineId Id="4646" Count="55" />
+      <LineId Id="2" Count="0" />
+    </LineIds>
+    <LineIds Name="DBManager.Update">
+      <LineId Id="3742" Count="78" />
+      <LineId Id="563" Count="0" />
+    </LineIds>
+  </POU>
+</TcPlcObject>
