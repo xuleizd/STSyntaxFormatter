@@ -10,6 +10,11 @@ obj/
 .vs/
 .idea/
 
+# Reasonix
+.reasonix/
+reasonix.toml
+AGENTS.md
+
 # Test scratch tooling
 testdata/*.ps1
 testdata/*.txt

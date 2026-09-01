@@ -1,3 +1,5 @@
+using System;
+using System.Linq;
 using STFormatterCore.Configuration;
 using STFormatterCore.Formatter;
 using STFormatterCore.Lexer;
@@ -362,7 +364,7 @@ namespace STFormatterCoreTests
         #region 16. FUNCTION_BLOCK formatting
 
         [Fact]
-        public void FunctionBlock_VarBlocksIndented_EndAligned()
+        public void FunctionBlock_VarBlocksAtHeaderLevel_EndAligned()
         {
             var source = "FUNCTION_BLOCK FB_Test\nVAR\nx : INT;\nEND_VAR\nx := 1;\nEND_FUNCTION_BLOCK";
             var result = Format(source);
@@ -371,17 +373,18 @@ namespace STFormatterCoreTests
             Assert.Contains("END_VAR", result);
             Assert.Contains("END_FUNCTION_BLOCK", result);
             var lines = result.Split(new[] { "\r\n", "\n" }, System.StringSplitOptions.None);
-            // VAR should be indented inside FUNCTION_BLOCK
-            bool varIndented = false;
-            foreach (var line in lines)
-            {
-                if (line.TrimStart() == "VAR" && line.Length > 0 && (line[0] == ' ' || line[0] == '\t'))
-                {
-                    varIndented = true;
-                    break;
-                }
-            }
-            Assert.True(varIndented, "VAR block should be indented inside FUNCTION_BLOCK");
+            // VAR belongs at the same level as the FUNCTION_BLOCK header (column 0),
+            // not indented. Only the member declarations inside are indented.
+            int varLine = Array.FindIndex(lines, l => l.TrimStart() == "VAR");
+            Assert.True(varLine >= 0, "VAR line not found");
+            Assert.True(lines[varLine].Length == 0 ||
+                        (lines[varLine][0] != ' ' && lines[varLine][0] != '\t'),
+                "VAR block must NOT be indented inside FUNCTION_BLOCK");
+            int memberLine = Array.FindIndex(lines, l => l.TrimStart().Equals("x : INT;", StringComparison.Ordinal));
+            Assert.True(memberLine > varLine, "member declaration must appear after VAR");
+            Assert.True(lines[memberLine].Length > 0 &&
+                        (lines[memberLine][0] == ' ' || lines[memberLine][0] == '\t'),
+                "member declaration must be indented inside VAR");
         }
 
         #endregion
@@ -411,6 +414,75 @@ namespace STFormatterCoreTests
             Assert.Contains("PUBLIC", result);
             Assert.Contains("END_METHOD", result);
             Assert.Contains("DoWork :=", result);
+        }
+
+        [Fact]
+        public void Method_VarBlocks_NotIndented_MembersIndented()
+        {
+            var source =
+                "METHOD PUBLIC Insert : BOOL\n" +
+                "VAR_INPUT\n" +
+                "execute : BOOL;\n" +
+                "entry   : InsertEntry;\n" +
+                "END_VAR\n" +
+                "VAR_OUTPUT\n" +
+                "done  : BOOL;\n" +
+                "error : BOOL;\n" +
+                "END_VAR\n" +
+                "VAR\n" +
+                "sqlCmd : STRING(200);\n" +
+                "END_VAR";
+            var result = Format(source);
+            var lines = result.Split(new[] { "\r\n", "\n" }, System.StringSplitOptions.None);
+
+            Assert.Contains("METHOD PUBLIC Insert : BOOL", result);
+
+            // VAR_INPUT / VAR_OUTPUT / VAR and their END_VAR belong at column 0,
+            // exactly under the METHOD header (not indented).
+            foreach (var keyword in new[] { "VAR_INPUT", "VAR_OUTPUT", "VAR", "END_VAR" })
+            {
+                int idx = Array.FindIndex(lines, l => l.Trim() == keyword);
+                Assert.True(idx >= 0, $"line '{keyword}' not found");
+                Assert.False(idx >= 0 && lines[idx].Length > 0 &&
+                            (lines[idx][0] == ' ' || lines[idx][0] == '\t'),
+                    $"'{keyword}' must not be indented inside METHOD");
+            }
+
+            // Member declarations are indented one level inside their VAR block.
+            int executeLine = Array.FindIndex(lines, l => l.Trim().Equals("execute : BOOL;", StringComparison.Ordinal));
+            Assert.True(executeLine >= 0, "member declaration not found");
+            Assert.True(lines[executeLine].Length > 0 &&
+                        (lines[executeLine][0] == ' ' || lines[executeLine][0] == '\t'),
+                "member declaration must be indented inside VAR_INPUT");
+        }
+
+        [Fact]
+        public void VarBlock_Comment_ThenDeclaration_KeepsIndent()
+        {
+            var source =
+                "FUNCTION_BLOCK DBManager\n" +
+                "VAR\n" +
+                "// 数据库连接 ID\n" +
+                "dbId : UDINT;\n" +
+                "// 最后一次错误码\n" +
+                "lastErrorID : UDINT;\n" +
+                "lastErrorMsg : STRING;\n" +
+                "END_VAR\n" +
+                "END_FUNCTION_BLOCK";
+            var result = Format(source);
+            var lines = result.Split(new[] { "\r\n", "\n" }, System.StringSplitOptions.None);
+
+            int commentLine = Array.FindIndex(lines, l => l.Trim().Equals("// 数据库连接 ID", StringComparison.Ordinal));
+            int declLine = Array.FindIndex(lines, l => l.Trim().StartsWith("dbId", StringComparison.Ordinal));
+
+            Assert.True(commentLine >= 0, "comment line not found");
+            Assert.True(declLine >= 0, "declaration line not found");
+            Assert.True(lines[commentLine].Length > 0 &&
+                        (lines[commentLine][0] == ' ' || lines[commentLine][0] == '\t'),
+                "comment must be indented inside VAR");
+            Assert.True(lines[declLine].Length > 0 &&
+                        (lines[declLine][0] == ' ' || lines[declLine][0] == '\t'),
+                "declaration after comment must keep its indentation");
         }
 
         #endregion

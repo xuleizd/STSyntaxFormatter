@@ -124,6 +124,40 @@ namespace STFormatterCore.Formatter
 
         #endregion
 
+        #region Body children (declaration vs statement indentation)
+
+        /// <summary>
+        /// Visits one child of a POU/METHOD/PROPERTY body. Statement nodes are
+        /// indented one level (they are implementation code); declaration-scope
+        /// nodes — VAR blocks, nested METHOD/PROPERTY headers, attribute pragmas,
+        /// TYPE/NAMESPACE/USING declarations — are written at the current indent so
+        /// they line up with their parent header, exactly as TwinCAT lays them out.
+        /// </summary>
+        private void VisitBodyChild(SyntaxNode child)
+        {
+            bool isStatement =
+                child is IfStatement ||
+                child is CaseStatement ||
+                child is ForStatement ||
+                child is WhileStatement ||
+                child is RepeatStatement ||
+                child is AssignmentStatement ||
+                child is ExpressionStatement ||
+                child is UnknownNode;
+
+            if (isStatement)
+            {
+                using (_indent.Push())
+                    Visit(child);
+            }
+            else
+            {
+                Visit(child);
+            }
+        }
+
+        #endregion
+
         #region Declaration Blocks (PROGRAM, FUNCTION, FUNCTION_BLOCK, INTERFACE)
 
         private void VisitDeclarationBlock(DeclarationBlock node)
@@ -182,12 +216,12 @@ namespace STFormatterCore.Formatter
 
             _output.WriteLine();
 
-            // Visit body children with increased indent
-            using (_indent.Push())
-            {
-                foreach (var child in node.Children)
-                    Visit(child);
-            }
+            // Visit body children. Statement bodies are indented one level; the
+            // declaration-scope children (VAR blocks and nested METHOD/PROPERTY/...)
+            // stay at the same level as the POU header, matching TwinCAT's layout
+            // where VAR belongs at column 0 directly under METHOD/PROGRAM.
+            foreach (var child in node.Children)
+                VisitBodyChild(child);
 
             // Blank lines before END
             for (int i = 0; i < _options.BlankLinesBeforeEnd; i++)
@@ -692,12 +726,11 @@ namespace STFormatterCore.Formatter
 
             _output.WriteLine();
 
-            // Visit body with increased indent
-            using (_indent.Push())
-            {
-                foreach (var child in node.Children)
-                    Visit(child);
-            }
+            // Visit body with the VAR blocks kept at the METHOD header's level
+            // (TwinCAT layout: METHOD at column 0, VAR_INPUT / VAR_OUTPUT / VAR
+            // directly under it, member declarations indented one level).
+            foreach (var child in node.Children)
+                VisitBodyChild(child);
 
             // Blank lines before END_METHOD
             for (int i = 0; i < _options.BlankLinesBeforeEnd; i++)
@@ -750,12 +783,10 @@ namespace STFormatterCore.Formatter
 
             _output.WriteLine();
 
-            // Visit GET/SET blocks with increased indent
-            using (_indent.Push())
-            {
-                foreach (var child in node.Children)
-                    Visit(child);
-            }
+            // Visit GET/SET blocks at the PROPERTY header's level (TwinCAT layout:
+            // PROPERTY at column 0, GET/SET directly under it, bodies indented).
+            foreach (var child in node.Children)
+                VisitBodyChild(child);
 
             // Blank lines before END_PROPERTY
             for (int i = 0; i < _options.BlankLinesBeforeEnd; i++)
@@ -2030,11 +2061,16 @@ namespace STFormatterCore.Formatter
                         break;
                     case TriviaKind.SingleLineComment:
                     case TriviaKind.MultiLineComment:
+                        // A comment that travelled as leading trivia sits on its own
+                        // line directly above the token. Emit it at the current
+                        // indent, end the line, and re-indent so the token itself
+                        // keeps its indentation (otherwise the token would start the
+                        // next line at column 0).
                         if (_output.IsAtLineStart)
                             _output.WriteIndent(_indent.CurrentIndent);
                         _output.Write(trivia.Text);
-                        if (trivia.Kind == TriviaKind.SingleLineComment)
-                            _output.WriteLine();
+                        _output.WriteLine();
+                        _output.WriteIndent(_indent.CurrentIndent);
                         break;
                     case TriviaKind.Whitespace:
                         break;
