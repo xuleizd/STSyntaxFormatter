@@ -36,5 +36,29 @@ namespace STFormatterCLI
         
         [Option("type-case", Default = "preserve", HelpText = "Type name case: upper, lower, or preserve")]
         public string TypeCase { get; set; }
+
+        [Option("use-spaces", HelpText = "Use spaces instead of tabs (true/false, default: engine default)")]
+        public bool? UseSpaces { get; set; }
+
+        [Option("operator-spacing", HelpText = "Spaces around operators (true/false, default: engine default)")]
+        public bool? OperatorSpacing { get; set; }
+
+        [Option("comma-spacing", HelpText = "Space after commas (true/false, default: engine default)")]
+        public bool? CommaSpacing { get; set; }
+
+        [Option("paren-inner-spacing", HelpText = "Spaces inside parentheses (true/false, default: engine default)")]
+        public bool? ParenInnerSpacing { get; set; }
+
+        [Option("max-line-length", HelpText = "Wrap lines longer than this (default: engine default)")]
+        public int? MaxLineLength { get; set; }
+
+        [Option("blank-lines-after-var", HelpText = "Blank lines after VAR...END_VAR blocks (default: engine default)")]
+        public int? BlankLinesAfterVar { get; set; }
+
+        [Option("blank-lines-before-end", HelpText = "Blank lines before END_IF/END_FOR etc. (default: engine default)")]
+        public int? BlankLinesBeforeEnd { get; set; }
+
+        [Option("blank-lines-around-blocks", HelpText = "Blank line around outermost IF/CASE/FOR/WHILE/REPEAT blocks (true/false, default: engine default)")]
+        public bool? BlankLinesAroundBlocks { get; set; }
     }
 }

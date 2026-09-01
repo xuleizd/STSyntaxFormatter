@@ -29,6 +29,7 @@ namespace STFormatterVSIX
         private bool keepEmptyLines = true;
         private int blankLinesAfterVar = 0;
         private int blankLinesBeforeEnd = 0;
+        private bool blankLinesAroundStatementBlocks = true;
 
         // 类型大小写
         private TypeCase typeCase = TypeCase.Preserve;
@@ -136,6 +137,15 @@ namespace STFormatterVSIX
         }
 
         [Category("格式化")]
+        [DisplayName("语句块前后空行")]
+        [Description("在最外层语句块（IF / CASE / FOR / WHILE / REPEAT）前后插入分隔空行。关闭后仅保留源码中已有的空行（受“保留空行”控制）。")]
+        public bool BlankLinesAroundStatementBlocks
+        {
+            get { return blankLinesAroundStatementBlocks; }
+            set { blankLinesAroundStatementBlocks = value; }
+        }
+
+        [Category("格式化")]
         [DisplayName("类型大小写")]
         [Description("类型名称的格式：大写、小写或保持原样。")]
         public TypeCase TypeCase
@@ -168,6 +178,7 @@ namespace STFormatterVSIX
                 KeepEmptyLines = KeepEmptyLines,
                 BlankLinesAfterVar = BlankLinesAfterVar,
                 BlankLinesBeforeEnd = BlankLinesBeforeEnd,
+                BlankLinesAroundStatementBlocks = BlankLinesAroundStatementBlocks,
                 MaxLineLength = MaxLineLength,
                 LineEnding = LineEnding,
                 ParenInnerSpacing = ParenInnerSpacing,

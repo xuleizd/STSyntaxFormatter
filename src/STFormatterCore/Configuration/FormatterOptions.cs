@@ -22,6 +22,10 @@ namespace STFormatterCore.Configuration
         public int BlankLinesBeforeEnd { get; set; } = 0;
         public int BlankLinesAfterVar { get; set; } = 0;
         public bool KeepEmptyLines { get; set; } = true;
+        // Separating blank line around outermost statement blocks (IF/CASE/FOR/
+        // WHILE/REPEAT). When false, only blank lines present in the source
+        // survive (subject to KeepEmptyLines) — paragraph-style layout.
+        public bool BlankLinesAroundStatementBlocks { get; set; } = true;
 
         // Type case
         public TypeCase TypeCase { get; set; } = TypeCase.Preserve;

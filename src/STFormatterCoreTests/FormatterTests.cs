@@ -1256,5 +1256,64 @@ namespace STFormatterCoreTests
         }
 
         #endregion
+
+        #region 52. BlankLinesAroundStatementBlocks option
+
+        [Fact]
+        public void BlankLinesAroundBlocks_DefaultTrue_BlankBetweenOuterBlocks()
+        {
+            var source =
+                "PROGRAM P\n" +
+                "IF a THEN\n" +
+                "x := 1;\n" +
+                "END_IF\n" +
+                "CASE i OF\n" +
+                "0:\n" +
+                "y := 2;\n" +
+                "END_CASE\n" +
+                "END_PROGRAM";
+            var result = Format(source, new FormatterOptions
+            {
+                KeepEmptyLines = false,
+                LineEnding = LineEnding.LF
+            });
+            var lines = result.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None);
+            int endIf = Array.FindIndex(lines, l => l.Trim() == "END_IF");
+            int caseIdx = Array.FindIndex(lines, l => l.Trim().StartsWith("CASE i"));
+            Assert.True(endIf >= 0 && caseIdx == endIf + 2,
+                "by default exactly one blank line separates outermost statement blocks");
+        }
+
+        [Fact]
+        public void BlankLinesAroundBlocks_False_NoBlankBetweenOuterBlocks()
+        {
+            var source =
+                "PROGRAM P\n" +
+                "IF a THEN\n" +
+                "x := 1;\n" +
+                "END_IF\n" +
+                "CASE i OF\n" +
+                "0:\n" +
+                "y := 2;\n" +
+                "END_CASE\n" +
+                "END_PROGRAM";
+            foreach (var keep in new[] { false, true })
+            {
+                var result = Format(source, new FormatterOptions
+                {
+                    KeepEmptyLines = keep,
+                    BlankLinesAroundStatementBlocks = false,
+                    LineEnding = LineEnding.LF
+                });
+                var lines = result.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None);
+                int endIf = Array.FindIndex(lines, l => l.Trim() == "END_IF");
+                int caseIdx = Array.FindIndex(lines, l => l.Trim().StartsWith("CASE i"));
+                Assert.True(endIf >= 0 && caseIdx == endIf + 1,
+                    $"BlankLinesAroundStatementBlocks=false (KeepEmptyLines={keep}): CASE must directly follow END_IF");
+                Assert.DoesNotContain("\n\n", result);
+            }
+        }
+
+        #endregion
     }
 }

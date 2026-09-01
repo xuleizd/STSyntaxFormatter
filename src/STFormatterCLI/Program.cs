@@ -26,6 +26,16 @@ namespace STFormatterCLI
                 AlignDeclarations = opts.AlignDeclarations,
                 KeepEmptyLines = opts.KeepEmptyLines,
             };
+
+            // Optional overrides: unspecified values keep the engine defaults.
+            if (opts.UseSpaces.HasValue) formatterOptions.UseSpacesInsteadOfTab = opts.UseSpaces.Value;
+            if (opts.OperatorSpacing.HasValue) formatterOptions.OperatorSpacing = opts.OperatorSpacing.Value;
+            if (opts.CommaSpacing.HasValue) formatterOptions.CommaSpacing = opts.CommaSpacing.Value;
+            if (opts.ParenInnerSpacing.HasValue) formatterOptions.ParenInnerSpacing = opts.ParenInnerSpacing.Value;
+            if (opts.MaxLineLength.HasValue) formatterOptions.MaxLineLength = opts.MaxLineLength.Value;
+            if (opts.BlankLinesAfterVar.HasValue) formatterOptions.BlankLinesAfterVar = opts.BlankLinesAfterVar.Value;
+            if (opts.BlankLinesBeforeEnd.HasValue) formatterOptions.BlankLinesBeforeEnd = opts.BlankLinesBeforeEnd.Value;
+            if (opts.BlankLinesAroundBlocks.HasValue) formatterOptions.BlankLinesAroundStatementBlocks = opts.BlankLinesAroundBlocks.Value;
             
             // Line ending
             if (opts.WindowsLineEnding) formatterOptions.LineEnding = LineEnding.CRLF;

@@ -57,8 +57,10 @@ namespace STFormatterCore.Formatter
             // (MaxLineLength wrapping happens inside WriteExpressionTokens so it is
             // CST-aware and idempotent — not as a text post-pass here.)
 
-            // Ensure single trailing newline
-            result = result.TrimEnd(' ', '\t') + _lineEnding;
+            // Ensure single trailing newline (the built text already ends with the
+            // last WriteLine's line break — strip all trailing line endings first
+            // so exactly one remains, and no blank line is left at the end).
+            result = result.TrimEnd(' ', '\t', '\r', '\n') + _lineEnding;
 
             return result;
         }
@@ -115,6 +117,7 @@ namespace STFormatterCore.Formatter
             // blocks at this outermost level get a separating blank line around them
             // (max one between neighbours); nested blocks do not (they use
             // VisitStatementList below).
+            bool aroundBlocks = _options.BlankLinesAroundStatementBlocks;
             for (int i = 0; i < node.Children.Count; i++)
             {
                 var child = node.Children[i];
@@ -123,12 +126,12 @@ namespace STFormatterCore.Formatter
                 bool hasNext = i < node.Children.Count - 1;
                 bool prevBlock = hasPrev && IsStatementBlock(node.Children[i - 1]);
 
-                if (hasPrev && (block || prevBlock))
+                if (aroundBlocks && hasPrev && (block || prevBlock))
                     _output.WriteBlankLine();
 
                 Visit(child);
 
-                if (hasNext && block)
+                if (aroundBlocks && hasNext && block)
                     _output.WriteBlankLine();
             }
 
@@ -177,6 +180,7 @@ namespace STFormatterCore.Formatter
         /// </summary>
         private void VisitBodyChildren(System.Collections.Generic.IList<SyntaxNode> children)
         {
+            bool aroundBlocks = _options.BlankLinesAroundStatementBlocks;
             for (int i = 0; i < children.Count; i++)
             {
                 var child = children[i];
@@ -185,12 +189,12 @@ namespace STFormatterCore.Formatter
                 bool hasNext = i < children.Count - 1;
                 bool prevBlock = hasPrev && IsStatementBlock(children[i - 1]);
 
-                if (hasPrev && (block || prevBlock))
+                if (aroundBlocks && hasPrev && (block || prevBlock))
                     _output.WriteBlankLine();
 
                 VisitBodyChild(child);
 
-                if (hasNext && block)
+                if (aroundBlocks && hasNext && block)
                     _output.WriteBlankLine();
             }
         }
