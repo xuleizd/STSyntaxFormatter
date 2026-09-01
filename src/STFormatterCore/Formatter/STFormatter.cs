@@ -110,11 +110,26 @@ namespace STFormatterCore.Formatter
 
         private void VisitCompilationUnit(CompilationUnit node)
         {
+            // Top-level children of a compilation unit (a full POU/METHOD text, or a
+            // bare implementation whose statements are parsed at the root). Statement
+            // blocks at this outermost level get a separating blank line around them
+            // (max one between neighbours); nested blocks do not (they use
+            // VisitStatementList below).
             for (int i = 0; i < node.Children.Count; i++)
             {
-                if (i > 0)
+                var child = node.Children[i];
+                bool block = IsStatementBlock(child);
+                bool hasPrev = i > 0;
+                bool hasNext = i < node.Children.Count - 1;
+                bool prevBlock = hasPrev && IsStatementBlock(node.Children[i - 1]);
+
+                if (hasPrev && (block || prevBlock))
                     _output.WriteBlankLine();
-                Visit(node.Children[i]);
+
+                Visit(child);
+
+                if (hasNext && block)
+                    _output.WriteBlankLine();
             }
 
             // Handle EOF trivia (trailing comments at end of file)
@@ -194,33 +209,16 @@ namespace STFormatterCore.Formatter
         }
 
         /// <summary>
-        /// Visits a list of statement children, inserting the separating blank line
-        /// that belongs *between siblings*: a blank line is written immediately
-        /// before a statement block that has a previous sibling and immediately
-        /// after a statement block that has a following sibling. This yields
-        /// exactly one blank line between an IF/CASE/FOR/WHILE/REPEAT block and its
-        /// neighbours without ever putting a blank line before the parent's END
-        /// keyword (the last child) or right after the block's opening line (the
-        /// first child). LineBuilder dedups so two adjacent blocks share one blank.
+        /// Visits a list of statement children of a *nested* body (IF/CASE/FOR/
+        /// WHILE/REPEAT bodies, ELSIF/ELSE clauses, GET/SET bodies). No separating
+        /// blank lines are inserted here: blank-line separation only applies to the
+        /// outermost statement blocks of the implementation, handled by
+        /// <see cref="VisitBodyChildren"/> and <see cref="VisitCompilationUnit"/>.
         /// </summary>
         private void VisitStatementList(System.Collections.Generic.IList<SyntaxNode> children)
         {
             for (int i = 0; i < children.Count; i++)
-            {
-                var child = children[i];
-                bool block = IsStatementBlock(child);
-                bool hasPrev = i > 0;
-                bool hasNext = i < children.Count - 1;
-                bool prevBlock = hasPrev && IsStatementBlock(children[i - 1]);
-
-                if (hasPrev && (block || prevBlock))
-                    _output.WriteBlankLine();
-
-                Visit(child);
-
-                if (hasNext && block)
-                    _output.WriteBlankLine();
-            }
+                Visit(children[i]);
         }
 
         #endregion
@@ -981,43 +979,26 @@ namespace STFormatterCore.Formatter
 
             // Visit body children with increased indent.
             // ELSIF/ELSE/END_IF are written at the IF indent level (saved above).
+            // This is a nested body, so no blank-line separation is inserted here.
             using (_indent.Push())
             {
-                for (int i = 0; i < node.Children.Count; i++)
+                foreach (var child in node.Children)
                 {
-                    var child = node.Children[i];
-                    bool block = IsStatementBlock(child);
-                    bool hasPrev = i > 0;
-                    bool hasNext = i < node.Children.Count - 1;
-                    bool prevBlock = hasPrev && IsStatementBlock(node.Children[i - 1]);
-
                     if (child is ElsifClause elsif)
                     {
                         // Write ELSIF at IF level (not body level)
                         _output.WriteIndent(ifIndent);
                         WriteElsifAtParentLevel(elsif);
-                        continue;
                     }
-                    if (child is ElseClause elseClause)
+                    else if (child is ElseClause elseClause)
                     {
                         // Write ELSE at IF level (not body level)
                         _output.WriteIndent(ifIndent);
                         WriteElseAtParentLevel(elseClause);
-                        continue;
                     }
-
-                    if (hasPrev && (block || prevBlock))
-                        _output.WriteBlankLine();
-
-                    Visit(child);
-
-                    if (hasNext && block)
+                    else
                     {
-                        // Only separate from a following regular statement, not from
-                        // a following ELSIF/ELSE clause (clauses stay attached).
-                        var next = node.Children[i + 1];
-                        if (!(next is ElsifClause) && !(next is ElseClause))
-                            _output.WriteBlankLine();
+                        Visit(child);
                     }
                 }
             }

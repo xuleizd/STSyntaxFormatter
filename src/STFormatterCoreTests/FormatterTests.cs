@@ -1114,6 +1114,37 @@ namespace STFormatterCoreTests
             Assert.Equal(1, blankBetween);
         }
 
+        [Fact]
+        public void NestedStatementBlocks_GetNoBlankLineSeparation()
+        {
+            var source =
+                "PROGRAM P\n" +
+                "IF a THEN\n" +
+                "x := 1;\n" +
+                "IF b THEN\n" +
+                "y := 2;\n" +
+                "END_IF\n" +
+                "END_IF\n" +
+                "END_PROGRAM";
+            var result = Format(source);
+            var lines = result.Split(new[] { "\r\n", "\n" }, System.StringSplitOptions.None);
+
+            // The nested IF must sit directly after its preceding statement with no
+            // blank line, and its END_IF directly before the outer END_IF.
+            int nestedIf = Array.FindIndex(lines, l => l.Trim() == "IF b THEN");
+            int outerEndIf = Array.FindIndex(lines, l => l.Trim() == "END_IF");
+            Assert.True(nestedIf >= 0 && outerEndIf > nestedIf, "nested IF / outer END_IF not found");
+
+            // No blank line between the statement above and the nested IF.
+            Assert.False(lines[nestedIf - 1].Trim().Length == 0,
+                "nested statement block must not get a leading blank line");
+
+            // The nested block body is directly followed by the outer END_IF (no blank).
+            int innerEndIf = Array.FindIndex(lines, nestedIf, l => l.Trim() == "END_IF");
+            Assert.True(innerEndIf >= 0 && lines[innerEndIf + 1].Trim() == "END_IF",
+                "nested block must not leave a blank line before the outer END_IF");
+        }
+
         #endregion
 
         #region 50. TypeCase applies only to built-in types
