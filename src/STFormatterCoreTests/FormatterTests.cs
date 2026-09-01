@@ -991,5 +991,119 @@ namespace STFormatterCoreTests
         }
 
         #endregion
+
+        #region 49. Blank line policy
+
+        [Fact]
+        public void StatementBlocks_GetBlankLineBeforeAndAfter_SingleBlankBetween()
+        {
+            var source =
+                "PROGRAM P\n" +
+                "IF a THEN\nx := 1;\nEND_IF\n" +
+                "IF b THEN\ny := 2;\nEND_IF\n" +
+                "z := 3;\nEND_PROGRAM";
+            var result = Format(source);
+            var lines = result.Split(new[] { "\r\n", "\n" }, System.StringSplitOptions.None);
+
+            int endIf1 = Array.FindIndex(lines, l => l.Trim() == "END_IF");
+            int if2 = Array.FindIndex(lines, l => l.Trim() == "IF b THEN");
+            Assert.True(endIf1 >= 0 && if2 > endIf1, "expected two consecutive IF blocks");
+
+            // Exactly one blank line between the two blocks (lines[endIf1+1] empty).
+            int blankCount = 0;
+            for (int i = endIf1 + 1; i < if2; i++)
+                if (lines[i].Trim().Length == 0) blankCount++;
+            Assert.Equal(1, blankCount);
+        }
+
+        [Fact]
+        public void KeepEmptyLines_PreservesSourceBlankLines_DoesNotAddNew()
+        {
+            var source =
+                "FUNCTION_BLOCK FB\n" +
+                "VAR_INPUT\n\n" +
+                "a : INT;\n" +
+                "END_VAR\n" +
+                "VAR_OUTPUT\n" +
+                "b : BOOL;\n" +
+                "END_VAR\n" +
+                "END_FUNCTION_BLOCK";
+            var options = new FormatterOptions { KeepEmptyLines = true };
+            var tokens = new STLexer(source).Tokenize();
+            var cst = new STParser(tokens).Parse();
+            var result = new STFormatter(options).Format(cst, source);
+            var lines = result.Split(new[] { "\r\n", "\n" }, System.StringSplitOptions.None);
+
+            int varInput = Array.FindIndex(lines, l => l.Trim() == "VAR_INPUT");
+            int decl = Array.FindIndex(lines, l => l.Trim() == "a : INT;");
+            Assert.True(varInput >= 0 && decl > varInput, "VAR_INPUT and declaration not found");
+            Assert.Equal(1, decl - varInput - 1); // exactly one blank line preserved between them
+            // VAR_OUTPUT directly follows END_VAR with no added blank line
+            int endVar = Array.FindIndex(lines, l => l.Trim() == "END_VAR");
+            int varOutput = Array.FindIndex(lines, l => l.Trim() == "VAR_OUTPUT");
+            Assert.Equal(endVar + 1, varOutput);
+        }
+
+        [Fact]
+        public void RemoveEmptyLines_RemovesSourceBlanksButKeepsBlockSeparators()
+        {
+            var source =
+                "PROGRAM P\n" +
+                "VAR\n\n" +
+                "a : INT;\n\n\n" +
+                "END_VAR\n" +
+                "WHILE x DO\nx := x + 1;\nEND_WHILE\n" +
+                "END_PROGRAM";
+            var options = new FormatterOptions { KeepEmptyLines = false };
+            var tokens = new STLexer(source).Tokenize();
+            var cst = new STParser(tokens).Parse();
+            var result = new STFormatter(options).Format(cst, source);
+            var lines = result.Split(new[] { "\r\n", "\n" }, System.StringSplitOptions.None);
+
+            // The VAR block must contain no blank lines.
+            int varLine = Array.FindIndex(lines, l => l.Trim() == "VAR");
+            int endVar = Array.FindIndex(lines, l => l.Trim() == "END_VAR");
+            Assert.True(varLine >= 0 && endVar > varLine, "VAR/END_VAR not found");
+            for (int i = varLine + 1; i < endVar; i++)
+                Assert.False(lines[i].Trim().Length == 0, "VAR block must not contain blank lines");
+
+            // The statement block (WHILE) still has its structural separating blank line
+            // before it (after END_VAR).
+            int whileLine = Array.FindIndex(lines, l => l.Trim() == "WHILE x DO");
+            Assert.True(whileLine > endVar, "WHILE block not found");
+            Assert.True(whileLine - endVar == 2, "expected exactly one blank line between END_VAR and WHILE block");
+        }
+
+        #endregion
+
+        #region 50. TypeCase applies only to built-in types
+
+        [Fact]
+        public void TypeCaseLower_OnlyAffectsBuiltInTypes()
+        {
+            var source =
+                "FUNCTION_BLOCK FB\n" +
+                "VAR\n" +
+                "a   : INT;\n" +
+                "arr : ARRAY[0 .. 5] OF ST_ExpParameter;\n" +
+                "msg : I_TcMessage;\n" +
+                "s   : STRING(200);\n" +
+                "END_VAR\n" +
+                "END_FUNCTION_BLOCK";
+            var options = new FormatterOptions { TypeCase = TypeCase.Lower };
+            var tokens = new STLexer(source).Tokenize();
+            var cst = new STParser(tokens).Parse();
+            var result = new STFormatter(options).Format(cst, source);
+
+            Assert.Contains(": int;", result);
+            Assert.Contains("array[0 .. 5] of", result);
+            Assert.Contains(": string(200);", result);
+            Assert.Contains("I_TcMessage", result);     // library type unchanged
+            Assert.DoesNotContain("i_tcmessage", result);
+            Assert.Contains("ST_ExpParameter", result); // user type unchanged
+            Assert.DoesNotContain("st_expparameter", result);
+        }
+
+        #endregion
     }
 }

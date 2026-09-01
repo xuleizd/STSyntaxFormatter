@@ -20,7 +20,7 @@ namespace STFormatterCore.Configuration
 
         // Blank lines
         public int BlankLinesBeforeEnd { get; set; } = 0;
-        public int BlankLinesAfterVar { get; set; } = 1;
+        public int BlankLinesAfterVar { get; set; } = 0;
         public bool KeepEmptyLines { get; set; } = true;
 
         // Type case

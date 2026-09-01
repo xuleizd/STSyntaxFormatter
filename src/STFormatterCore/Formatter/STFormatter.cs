@@ -156,6 +156,27 @@ namespace STFormatterCore.Formatter
             }
         }
 
+        /// <summary>
+        /// Writes the blank line that separates a statement block (IF/CASE/FOR/
+        /// WHILE/REPEAT) from the code above it. Suppressed only when nothing has
+        /// been written yet, so the document never starts with a blank line.
+        /// </summary>
+        private void WriteStatementBlockLeadingBlank()
+        {
+            if (!_output.IsEmpty)
+                _output.WriteBlankLine();
+        }
+
+        /// <summary>
+        /// Writes the blank line that separates a statement block from the code
+        /// below it. LineBuilder dedups consecutive blank lines, so two adjacent
+        /// blocks never produce more than one blank line between them.
+        /// </summary>
+        private void WriteStatementBlockTrailingBlank()
+        {
+            _output.WriteBlankLine();
+        }
+
         #endregion
 
         #region Declaration Blocks (PROGRAM, FUNCTION, FUNCTION_BLOCK, INTERFACE)
@@ -879,6 +900,8 @@ namespace STFormatterCore.Formatter
 
         private void VisitIfStatement(IfStatement node)
         {
+            WriteStatementBlockLeadingBlank();
+
             string ifIndent = _indent.CurrentIndent;
             _output.WriteIndent(ifIndent);
 
@@ -957,6 +980,8 @@ namespace STFormatterCore.Formatter
                 _output.WriteKeyword("END_IF");
             }
             _output.WriteLine();
+
+            WriteStatementBlockTrailingBlank();
         }
 
         /// <summary>
@@ -1101,6 +1126,8 @@ namespace STFormatterCore.Formatter
 
         private void VisitCaseStatement(CaseStatement node)
         {
+            WriteStatementBlockLeadingBlank();
+
             _output.WriteIndent(_indent.CurrentIndent);
 
             var selectorTokens = new List<Token>();
@@ -1164,6 +1191,8 @@ namespace STFormatterCore.Formatter
                 _output.WriteKeyword("END_CASE");
             }
             _output.WriteLine();
+
+            WriteStatementBlockTrailingBlank();
         }
 
         private void VisitCaseBranch(CaseBranch node)
@@ -1230,6 +1259,8 @@ namespace STFormatterCore.Formatter
 
         private void VisitForStatement(ForStatement node)
         {
+            WriteStatementBlockLeadingBlank();
+
             _output.WriteIndent(_indent.CurrentIndent);
 
             var bodyTokens = new List<Token>();
@@ -1291,10 +1322,14 @@ namespace STFormatterCore.Formatter
                 _output.WriteKeyword("END_FOR");
             }
             _output.WriteLine();
+
+            WriteStatementBlockTrailingBlank();
         }
 
         private void VisitWhileStatement(WhileStatement node)
         {
+            WriteStatementBlockLeadingBlank();
+
             _output.WriteIndent(_indent.CurrentIndent);
 
             var condTokens = new List<Token>();
@@ -1355,10 +1390,14 @@ namespace STFormatterCore.Formatter
                 _output.WriteKeyword("END_WHILE");
             }
             _output.WriteLine();
+
+            WriteStatementBlockTrailingBlank();
         }
 
         private void VisitRepeatStatement(RepeatStatement node)
         {
+            WriteStatementBlockLeadingBlank();
+
             _output.WriteIndent(_indent.CurrentIndent);
 
             Token untilToken = null;
@@ -1431,6 +1470,8 @@ namespace STFormatterCore.Formatter
                 _output.WriteKeyword("END_REPEAT");
             }
             _output.WriteLine();
+
+            WriteStatementBlockTrailingBlank();
         }
 
         #endregion
@@ -1970,7 +2011,11 @@ namespace STFormatterCore.Formatter
         /// </summary>
         private void WriteTokenFormatted(Token token)
         {
-            if (IsKeyword(token.Kind))
+            if (IsTypeKeyword(token.Kind))
+            {
+                _output.Write(FormatTypeTokenText(token));
+            }
+            else if (IsKeyword(token.Kind))
             {
                 _output.WriteKeyword(token.Text);
             }
@@ -1998,16 +2043,24 @@ namespace STFormatterCore.Formatter
 
         /// <summary>
         /// Writes a type-position token applying TypeCase option.
+        /// TypeCase only affects *built-in* type tokens: the standard type
+        /// identifiers (BOOL, INT, STRING, ...) and the type keywords (ARRAY, OF,
+        /// POINTER, REFERENCE, TO). Library/user-defined types such as I_TcMessage
+        /// are identifiers that are NOT standard types, so they keep their original
+        /// spelling exactly.
         /// </summary>
         private void WriteTypeToken(Token token)
         {
-            if (IsKeyword(token.Kind))
+            if (IsTypeKeyword(token.Kind))
             {
-                _output.WriteKeyword(token.Text);
+                _output.Write(ApplyTypeCase(token.Text));
             }
             else if (token.Kind == TokenKind.Identifier)
             {
-                _output.Write(ApplyTypeCase(token.Text));
+                if (StandardTypes.Contains(token.Text))
+                    _output.Write(ApplyTypeCase(token.Text));
+                else
+                    _output.Write(token.Text);
             }
             else
             {
@@ -2016,13 +2069,30 @@ namespace STFormatterCore.Formatter
         }
 
         /// <summary>
-        /// Applies TypeCase option to a token's text.
+        /// Applies TypeCase option to a token's text, but only for built-in types:
+        /// standard type identifiers and the type keywords (ARRAY, OF, POINTER,
+        /// REFERENCE, TO). Nothing else is touched.
         /// </summary>
         private string FormatTypeTokenText(Token token)
         {
             if (token.Kind == TokenKind.Identifier && StandardTypes.Contains(token.Text))
                 return ApplyTypeCase(token.Text);
+            if (IsTypeKeyword(token.Kind))
+                return ApplyTypeCase(token.Text);
             return token.Text;
+        }
+
+        /// <summary>
+        /// True for the keyword tokens that appear in type position (ARRAY, OF,
+        /// POINTER, REFERENCE, TO). These are the "keyword types" TypeCase applies to.
+        /// </summary>
+        private static bool IsTypeKeyword(TokenKind kind)
+        {
+            return kind == TokenKind.Keyword_Array ||
+                   kind == TokenKind.Keyword_Of ||
+                   kind == TokenKind.Keyword_Pointer ||
+                   kind == TokenKind.Keyword_Reference ||
+                   kind == TokenKind.Keyword_To;
         }
 
         private string ApplyTypeCase(string text)
@@ -2052,12 +2122,31 @@ namespace STFormatterCore.Formatter
                 switch (trivia.Kind)
                 {
                     case TriviaKind.NewLine:
-                        // Never emit newlines from token trivia: line breaks are the
-                        // responsibility of the structural visit methods (they write
-                        // explicit indentation and WriteLine calls). Emitting the
-                        // original trivia newlines here stacks with those explicit
-                        // breaks and produces double/blank lines and split
-                        // declarations (e.g. "execute : BOOL;" becoming two lines).
+                        // A lone newline is the structural line break written by the
+                        // visit methods, so it must not be re-emitted here. But two
+                        // or more consecutive newlines mean an *intentional blank
+                        // line* in the source; preserve it only when KeepEmptyLines
+                        // is true (that option means "keep existing blank lines",
+                        // not "add new ones"). After the blank line the following
+                        // token starts a new line, so re-apply the current indent —
+                        // otherwise the token would start at column 0.
+                        if (_options.KeepEmptyLines)
+                        {
+                            int newlines = 1;
+                            int idx = token.LeadingTrivia.IndexOf(trivia);
+                            for (int k = idx + 1; k < token.LeadingTrivia.Count; k++)
+                            {
+                                if (token.LeadingTrivia[k].Kind == TriviaKind.NewLine)
+                                    newlines++;
+                                else
+                                    break;
+                            }
+                            if (newlines >= 2)
+                            {
+                                _output.WriteBlankLine();
+                                _output.WriteIndent(_indent.CurrentIndent);
+                            }
+                        }
                         break;
                     case TriviaKind.SingleLineComment:
                     case TriviaKind.MultiLineComment:
@@ -2257,16 +2346,17 @@ namespace STFormatterCore.Formatter
         }
 
         /// <summary>
-        /// Normalizes blank lines. The idempotent collapse (never keep more than one
-        /// blank line) always runs; when <see cref="FormatterOptions.KeepEmptyLines"/>
-        /// is false, all blank lines are removed on top of that (TcBlack's
-        /// removeEmptyLines behaviour). Both steps are deterministic fixed points.
+        /// Collapses runs of blank lines to at most one (idempotent fixed point).
+        /// Blank-line *removal* for KeepEmptyLines=false happens earlier, at emit
+        /// time: source blank lines are only written when KeepEmptyLines is true,
+        /// while structural blank lines around statement blocks (IF/CASE/FOR/
+        /// WHILE/REPEAT) are always written. So this pass only needs to dedup.
         /// </summary>
         private string NormalizeBlankLines(string text)
         {
             if (string.IsNullOrEmpty(text)) return text;
 
-            // Step 1: collapse runs of blank lines to at most one (idempotent).
+            // Collapse runs of blank lines to at most one (idempotent).
             var lines = text.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None);
             var collapsed = new System.Collections.Generic.List<string>();
             int consecutiveEmpty = 0;
@@ -2285,19 +2375,6 @@ namespace STFormatterCore.Formatter
                 collapsed.Add(line);
             }
             text = string.Join(_lineEnding, collapsed);
-
-            // Step 2: when not keeping empty lines, remove every blank line.
-            if (!_options.KeepEmptyLines)
-            {
-                lines = text.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None);
-                var kept = new System.Collections.Generic.List<string>();
-                foreach (var line in lines)
-                {
-                    if (line.Trim(' ', '\t').Length == 0) continue;
-                    kept.Add(line);
-                }
-                text = string.Join(_lineEnding, kept);
-            }
 
             return text;
         }

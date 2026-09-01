@@ -27,7 +27,7 @@ namespace STFormatterVSIX
 
         // 空行
         private bool keepEmptyLines = true;
-        private int blankLinesAfterVar = 1;
+        private int blankLinesAfterVar = 0;
         private int blankLinesBeforeEnd = 0;
 
         // 类型大小写

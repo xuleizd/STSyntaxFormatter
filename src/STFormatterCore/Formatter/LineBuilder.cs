@@ -25,6 +25,12 @@ namespace STFormatterCore.Formatter
         public bool IsAtLineStart => _atLineStart;
 
         /// <summary>
+        /// True when nothing has been written yet. Used to avoid emitting a leading
+        /// blank line before the first statement of a document/body.
+        /// </summary>
+        public bool IsEmpty => _sb.Length == 0;
+
+        /// <summary>
         /// True when indent has been written but no content yet on this line.
         /// Used to suppress leading-trivia newlines that would create extra blank lines.
         /// </summary>
