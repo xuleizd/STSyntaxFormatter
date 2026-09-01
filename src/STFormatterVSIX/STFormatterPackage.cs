@@ -18,8 +18,8 @@ namespace STFormatterVSIX
     /// Registers commands, options page, and format-on-save events.
     /// </summary>
     [PackageRegistration(UseManagedResourcesOnly = true, AllowsBackgroundLoading = true)]
-    [InstalledProductRegistration("ST Syntax Formatter", "TwinCAT3 ST code formatter", "1.0")]
-    [ProvideOptionPage(typeof(OptionsPage), "ST Formatter", "General", 0, 0, true)]
+    [InstalledProductRegistration("ST 格式化器", "TwinCAT3 ST 代码格式化工具", "0.2.0")]
+    [ProvideOptionPage(typeof(OptionsPage), "ST 格式化", "常规", 0, 0, true)]
     [ProvideMenuResource("Menus.ctmenu", 1)]
     [Guid(STFormatterPackage.PackageGuidString)]
     [ProvideAutoLoad(UIContextGuids80.SolutionExists, PackageAutoLoadFlags.BackgroundLoad)]

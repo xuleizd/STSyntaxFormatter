@@ -572,7 +572,11 @@ namespace STFormatterCore.Parser
         {
             var node = new MethodDeclaration();
 
-            // Optional access modifier
+            // METHOD keyword first (TwinCAT syntax: METHOD [access] [modifiers] name : type)
+            if (Current.Kind == TokenKind.Keyword_Method)
+                node.AddToken(Advance());
+
+            // Optional access modifier (PUBLIC/PROTECTED/PRIVATE/INTERNAL)
             if (IsAccessModifier(Current.Kind))
             {
                 node.AccessModifier = Current.Text;
@@ -589,10 +593,6 @@ namespace STFormatterCore.Parser
                 if (Current.Kind == TokenKind.Keyword_Override) node.IsOverride = true;
                 node.AddToken(Advance());
             }
-
-            // METHOD keyword
-            if (Current.Kind == TokenKind.Keyword_Method)
-                node.AddToken(Advance());
 
             // Name
             if (Current.Kind == TokenKind.Identifier)

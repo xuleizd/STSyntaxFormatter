@@ -2040,10 +2040,12 @@ namespace STFormatterCore.Formatter
                 switch (trivia.Kind)
                 {
                     case TriviaKind.NewLine:
-                        // Skip newline if indent was just written or already at line start.
-                        // This prevents extra blank lines after WriteIndent calls.
-                        if (!_output.IsAtLineStart && !_output.IsIndentWritten)
-                            _output.WriteLine();
+                        // Never emit newlines from token trivia: line breaks are the
+                        // responsibility of the structural visit methods (they write
+                        // explicit indentation and WriteLine calls). Emitting the
+                        // original trivia newlines here stacks with those explicit
+                        // breaks and produces double/blank lines and split
+                        // declarations (e.g. "execute : BOOL;" becoming two lines).
                         break;
                     case TriviaKind.SingleLineComment:
                     case TriviaKind.MultiLineComment:
