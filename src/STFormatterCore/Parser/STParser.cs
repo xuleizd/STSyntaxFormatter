@@ -33,6 +33,11 @@ namespace STFormatterCore.Parser
                     unit.AddChild(decl);
             }
 
+            // Comments after the last construct travel as the EOF token's leading
+            // trivia, so the token has to survive parsing or they are deleted with it.
+            if (_position < _tokens.Count && _tokens[_position].Kind == TokenKind.EndOfFile)
+                unit.AddToken(_tokens[_position]);
+
             return unit;
         }
 

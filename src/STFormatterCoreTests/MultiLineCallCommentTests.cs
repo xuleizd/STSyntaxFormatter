@@ -14,6 +14,8 @@ namespace STFormatterCoreTests
     /// argument sat one column to the right of the first; and a commented-out
     /// argument used to open a blank line after itself, because a line holding
     /// nothing but indentation was taken for a line that already had code on it.
+    /// The comment text itself is normalized too — exactly one space after '//' —
+    /// so the padding TwinCAT's comment toggle leaves behind cannot survive.
     /// </summary>
     public class MultiLineCallCommentTests
     {
@@ -59,20 +61,21 @@ namespace STFormatterCoreTests
                 "END_IF\n",
                 "IF cmd.ExecuteDataReturn(\n" +
                 "    hDBID := dbId,\n" +
-                "    //             pData := ADR(search),\n" +
-                "    //             cbData := SIZEOF(search),\n" +
-                "    //             pParameter := ADR(para),\n" +
+                "    // pData := ADR(search),\n" +
+                "    // cbData := SIZEOF(search),\n" +
+                "    // pParameter := ADR(para),\n" +
                 "    nStartIndex := 0) THEN\n" +
                 "    x := 1;\n" +
                 "END_IF\n");
         }
 
         [Fact]
-        public void CommentedArgument_TextAfterTheSlashesIsNeverReindented()
+        public void CommentedArgument_PaddingAfterTheSlashesIsCollapsedToOneSpace()
         {
             // TwinCAT's comment toggle prepends "//" at column 0 and leaves the
-            // line's original indentation inside the comment text. Comment bodies
-            // are preserved verbatim, so that padding must survive untouched.
+            // line's original indentation inside the comment text. A comment is
+            // formatted like any other line, so that fossilized padding collapses
+            // to the single space every '//' is followed by.
             var result = Format(
                 "IF cmd.ExecuteDataReturn(\n" +
                 "    hDBID := dbId,\n" +
@@ -82,7 +85,8 @@ namespace STFormatterCoreTests
                 "END_IF\n",
                 keepEmptyLines: false);
 
-            Assert.Contains("//             pData := ADR(search),", result);
+            Assert.Contains("// pData := ADR(search),", result);
+            Assert.DoesNotContain("//  ", result);
         }
 
         [Fact]
@@ -135,7 +139,7 @@ namespace STFormatterCoreTests
                 "END_IF\n",
                 "IF cmd.ExecuteDataReturn(\n" +
                 "    hDBID := dbId,\n" +
-                "    //             pData := ADR(search),\n" +
+                "    // pData := ADR(search),\n" +
                 "    nStartIndex := 0) THEN\n" +
                 "    x := 1;\n" +
                 "END_IF\n");
@@ -200,7 +204,7 @@ namespace STFormatterCoreTests
                 "fb.bAbsX := TRUE;\n",
                 "a := 1;\n" +
                 "(*note*)\n" +
-                "//fb.Velocity := 20;\n" +
+                "// fb.Velocity := 20;\n" +
                 "fb.bAbsX := TRUE;\n");
         }
 
@@ -215,7 +219,7 @@ namespace STFormatterCoreTests
                 "END_IF\n",
                 "IF x THEN\n" +
                 "    (*note*)\n" +
-                "    //c\n" +
+                "    // c\n" +
                 "    y := 1;\n" +
                 "END_IF\n");
         }
@@ -235,10 +239,10 @@ namespace STFormatterCoreTests
             // merged to a single one otherwise. Neither mode may drop the run
             // outright or double it.
             Assert.Equal(
-                "a := 1;\n//c1\n\n\n//c2\nb := 2;\n",
+                "a := 1;\n// c1\n\n\n// c2\nb := 2;\n",
                 Format(source, keepEmptyLines: true));
             Assert.Equal(
-                "a := 1;\n//c1\n\n//c2\nb := 2;\n",
+                "a := 1;\n// c1\n\n// c2\nb := 2;\n",
                 Format(source, keepEmptyLines: false));
         }
     }

@@ -121,8 +121,11 @@ namespace STFormatterCore.Formatter
             bool bareImplementation = IsBareImplementation(node.Children);
             VisitBodyChildren(node.Children, bareImplementation);
 
-            // Handle EOF trivia (trailing comments at end of file)
-            // The parser doesn't store EOF, but any trailing trivia is on the last child
+            // Comments after the last construct — including a body that is nothing
+            // but comments — travel as the EOF token's leading trivia.
+            var eof = node.Tokens.LastOrDefault(t => t.Kind == TokenKind.EndOfFile);
+            if (eof != null)
+                WriteLeadingTrivia(eof);
         }
 
         /// <summary>
@@ -748,14 +751,15 @@ namespace STFormatterCore.Formatter
         }
 
         /// <summary>
-        /// Writes a node's tokens preserving every token's original text and its
-        /// comments exactly as they appeared in the source. Line layout follows the
-        /// formatter's policies: continuation lines are re-indented at the current
+        /// Writes a node's tokens preserving every token's original text, with the
+        /// comments normalized the same way as everywhere else. Line layout follows
+        /// the formatter's policies: continuation lines are re-indented at the current
         /// level, and blank lines in the source follow the KeepEmptyLines policy —
-        /// but separate source lines are NEVER merged and intra-line whitespace is
-        /// NEVER dropped. Merging lines would let a '//' comment swallow the code
-        /// that follows it, and dropping spaces glues tokens together until the code
-        /// no longer compiles.
+        /// but separate source lines are NEVER merged and intra-line whitespace
+        /// between tokens is NEVER dropped. Merging lines would let a '//' comment
+        /// swallow the code that follows it, and dropping spaces glues tokens together
+        /// until the code no longer compiles. Whitespace in front of a comment is the
+        /// one exception: it is replaced by the fixed comment gap.
         /// </summary>
         private void WriteTokensVerbatim(System.Collections.Generic.IEnumerable<Token> tokens)
         {
@@ -772,25 +776,40 @@ namespace STFormatterCore.Formatter
             // The caller has already emitted content when it hands over seed trivia.
             bool emittedContent = seedTrailingTrivia != null;
             int pendingNewlines = 0;
+            string pendingWhitespace = null;
+
+            void FlushWhitespace()
+            {
+                if (pendingWhitespace == null) return;
+                // Line-start whitespace is replaced by the indent written when
+                // newlines are flushed; mid-line whitespace must stay or the
+                // tokens on either side of it would be glued together.
+                if (pendingNewlines == 0 && emittedContent)
+                    _output.Write(pendingWhitespace);
+                pendingWhitespace = null;
+            }
 
             void Emit(Trivia trivia)
             {
                 switch (trivia.Kind)
                 {
                     case TriviaKind.NewLine:
+                        pendingWhitespace = null;
                         pendingNewlines++;
                         break;
                     case TriviaKind.Whitespace:
-                        // Line-start whitespace is replaced by the indent written when
-                        // newlines are flushed; mid-line whitespace must stay or the
-                        // tokens on either side of it would be glued together.
-                        if (pendingNewlines == 0 && emittedContent)
-                            _output.Write(trivia.Text);
+                        // Held back: when a comment turns out to be next, the source's
+                        // own padding gives way to the fixed comment gap.
+                        pendingWhitespace = trivia.Text;
                         break;
                     case TriviaKind.SingleLineComment:
                     case TriviaKind.MultiLineComment:
+                        bool inline = pendingNewlines == 0 && emittedContent;
+                        pendingWhitespace = null;
                         FlushNewlines();
-                        _output.Write(trivia.Text);
+                        if (inline)
+                            WriteCommentGap(trivia.Kind == TriviaKind.SingleLineComment);
+                        _output.WriteComment(NormalizeCommentText(trivia.Text));
                         emittedContent = true;
                         break;
                 }
@@ -821,6 +840,7 @@ namespace STFormatterCore.Formatter
                     foreach (var trivia in tok.LeadingTrivia)
                         Emit(trivia);
 
+                FlushWhitespace();
                 FlushNewlines();
                 _output.Write(tok.Text);
                 emittedContent = true;
@@ -1322,7 +1342,9 @@ namespace STFormatterCore.Formatter
                         {
                             if (_output.IsAtLineStart)
                                 _output.WriteIndent(_indent.CurrentIndent);
-                            _output.Write(trivia.Text);
+                            else
+                                WriteCommentGap(trivia.Kind == TriviaKind.SingleLineComment);
+                            _output.WriteComment(NormalizeCommentText(trivia.Text));
                             if (trivia.Kind == TriviaKind.SingleLineComment)
                             {
                                 _output.WriteLine();
@@ -1345,6 +1367,11 @@ namespace STFormatterCore.Formatter
 
             if (!wroteColon)
                 _output.Write(":");
+
+            // A comment on the label's own line ("1: // note") is trailing trivia of
+            // the last label token; the loop above only reads leading trivia.
+            if (node.Tokens.Count > 0)
+                WriteTrailingTrivia(node.Tokens[node.Tokens.Count - 1]);
 
             _output.WriteLine();
 
@@ -1745,7 +1772,9 @@ namespace STFormatterCore.Formatter
 
                 if (_output.IsAtLineStart)
                     _output.WriteIndent(indent);
-                _output.WriteComment(item.Text);
+                else
+                    WriteCommentGap(item.Kind == TriviaKind.SingleLineComment);
+                _output.WriteComment(NormalizeCommentText(item.Text));
 
                 if (item.Kind == TriviaKind.SingleLineComment)
                 {
@@ -2331,6 +2360,48 @@ namespace STFormatterCore.Formatter
         #region Trivia Handling
 
         /// <summary>
+        /// Spaces between a statement's last token and a trailing '//' comment.
+        /// </summary>
+        private const string TrailingLineCommentGap = "    ";
+
+        /// <summary>
+        /// Normalizes a comment's own text so exactly one space follows '//':
+        /// '//   note' and '//note' both become '// note'. A bare '//' stays bare,
+        /// and a literal '///' is treated as a marker in its own right rather than
+        /// being split into '// /'. Block comments are left alone — the rule is
+        /// about the marker a reader scans for.
+        /// </summary>
+        internal static string NormalizeCommentText(string text)
+        {
+            if (string.IsNullOrEmpty(text) || text.Length < 2 ||
+                text[0] != '/' || text[1] != '/')
+                return text;
+
+            int marker = text.StartsWith("///") ? 3 : 2;
+            int body = marker;
+            while (body < text.Length && (text[body] == ' ' || text[body] == '\t'))
+                body++;
+
+            if (body == text.Length) return text.Substring(0, marker);
+            return text.Substring(0, marker) + " " + text.Substring(body);
+        }
+
+        /// <summary>
+        /// Writes the whitespace in front of a comment that follows code on the same
+        /// line. A '//' comment sits a fixed 4 spaces away; a block comment keeps a
+        /// single space. Nothing is written when the line holds no content yet, so a
+        /// comment on a line of its own is not pushed off its indent.
+        /// </summary>
+        private void WriteCommentGap(bool lineComment)
+        {
+            if (!_output.HasContentOnLine) return;
+            // Through WriteComment rather than Write: the gap belongs to the comment,
+            // and marking it as code would make a comment-only line look like an
+            // expression continuation to the next line's indent decision.
+            _output.WriteComment(lineComment ? TrailingLineCommentGap : " ");
+        }
+
+        /// <summary>
         /// Converts a run of <paramref name="sourceNewlines"/> newline trivia into the
         /// number of blank lines to emit: two newlines mean one blank line, since the
         /// first only ends the previous source line. KeepEmptyLines=true keeps the
@@ -2411,7 +2482,9 @@ namespace STFormatterCore.Formatter
                         FlushBlankLines();
                         if (_output.IsAtLineStart)
                             _output.WriteIndent(_indent.CurrentIndent);
-                        _output.Write(trivia.Text);
+                        else
+                            WriteCommentGap(trivia.Kind == TriviaKind.SingleLineComment);
+                        _output.WriteComment(NormalizeCommentText(trivia.Text));
                         _output.WriteLine();
                         _output.WriteIndent(_indent.CurrentIndent);
                         break;
@@ -2424,7 +2497,9 @@ namespace STFormatterCore.Formatter
         }
 
         /// <summary>
-        /// Writes trailing trivia (inline comments) after a token.
+        /// Writes trailing trivia (inline comments) after a token. The comment sits a
+        /// fixed distance from the code in front of it and its own text is normalized,
+        /// so reformatting cannot move it or grow the padding after '//'.
         /// </summary>
         private void WriteTrailingTrivia(Token token)
         {
@@ -2436,12 +2511,12 @@ namespace STFormatterCore.Formatter
                 switch (trivia.Kind)
                 {
                     case TriviaKind.SingleLineComment:
-                        _output.Write(" ");
-                        _output.Write(trivia.Text);
+                        WriteCommentGap(lineComment: true);
+                        _output.WriteComment(NormalizeCommentText(trivia.Text));
                         break;
                     case TriviaKind.MultiLineComment:
-                        _output.Write(" ");
-                        _output.Write(trivia.Text);
+                        WriteCommentGap(lineComment: false);
+                        _output.WriteComment(NormalizeCommentText(trivia.Text));
                         break;
                     case TriviaKind.NewLine:
                         // Skip newlines in trailing trivia - the explicit WriteLine()

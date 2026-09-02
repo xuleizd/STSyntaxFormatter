@@ -195,19 +195,16 @@ namespace STFormatterCore.Lexer
                 pendingTrivia.Clear();
                 ScanTrivia(pendingTrivia, out bool hasNewline);
 
-                if (IsAtEnd)
-                {
-                    _tokens.Add(new Token(TokenKind.EndOfFile, string.Empty, _pos,
-                        new List<Trivia>(pendingTrivia)));
-                    break;
-                }
-
                 // Categorize trivia: anything on the same line (before the first
                 // newline) belongs to the previous token as TRAILING trivia;
                 // the first newline and everything after it becomes LEADING trivia
                 // of the token we are about to scan. This keeps "x := 1; // comment"
                 // attached to the previous line even though the newline after the
                 // comment was consumed in the same pass.
+                //
+                // This must run BEFORE the end-of-file check: a comment on the last
+                // line of the source has nothing but EOF after it, and filing it as
+                // EOF's leading trivia deletes it, because no visitor ever reads EOF.
                 if (pendingTrivia.Count > 0)
                 {
                     int firstNewline = -1;
@@ -249,6 +246,13 @@ namespace STFormatterCore.Lexer
                         _tokens[_tokens.Count - 1].TrailingTrivia.AddRange(pendingTrivia);
                         pendingTrivia.Clear();
                     }
+                }
+
+                if (IsAtEnd)
+                {
+                    _tokens.Add(new Token(TokenKind.EndOfFile, string.Empty, _pos,
+                        new List<Trivia>(pendingTrivia)));
+                    break;
                 }
 
                 int tokenStart = _pos;

@@ -11,9 +11,11 @@ namespace STFormatterCoreTests
     /// Statements that carry a comment mid-statement (a trailing comment on a
     /// token that is NOT the last one) are preserved token-for-token instead of
     /// being reflowed. These tests pin the verbatim state machine that replaced
-    /// the destructive WriteTriviaVerbatim path: intra-line whitespace must
+    /// the destructive WriteTriviaVerbatim path: whitespace between tokens must
     /// never be dropped, separate source lines must never be merged, and with
-    /// KeepEmptyLines=false only blank lines may disappear.
+    /// KeepEmptyLines=false only blank lines may disappear. The comment itself is
+    /// not verbatim — its padding is replaced by the fixed comment gap and its
+    /// text is normalized like any other comment.
     /// </summary>
     public class VerbatimCommentTests
     {
