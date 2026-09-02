@@ -55,6 +55,7 @@
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="ChineseOptionConverters.cs" />
     <Compile Include="Commands\FormatDocumentCommand.cs" />
     <Compile Include="ContentType\STContentTypeDefinition.cs" />
     <Compile Include="OptionsPage.cs" />

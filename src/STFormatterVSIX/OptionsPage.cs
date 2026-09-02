@@ -40,6 +40,7 @@ namespace STFormatterVSIX
         [Category("缩进")]
         [DisplayName("使用空格")]
         [Description("使用空格代替 Tab 进行缩进。")]
+        [TypeConverter(typeof(ChineseBooleanConverter))]
         public bool UseSpacesInsteadOfTab
         {
             get { return useSpacesInsteadOfTab; }
@@ -58,6 +59,7 @@ namespace STFormatterVSIX
         [Category("格式化")]
         [DisplayName("运算符两侧加空格")]
         [Description("在运算符两侧添加空格（例如 a := b + c）。")]
+        [TypeConverter(typeof(ChineseBooleanConverter))]
         public bool OperatorSpacing
         {
             get { return operatorSpacing; }
@@ -67,6 +69,7 @@ namespace STFormatterVSIX
         [Category("格式化")]
         [DisplayName("逗号后加空格")]
         [Description("在逗号后添加空格（例如 Func(a, b, c)）。")]
+        [TypeConverter(typeof(ChineseBooleanConverter))]
         public bool CommaSpacing
         {
             get { return commaSpacing; }
@@ -76,6 +79,7 @@ namespace STFormatterVSIX
         [Category("格式化")]
         [DisplayName("对齐变量声明")]
         [Description("对齐 VAR 块中的冒号。")]
+        [TypeConverter(typeof(ChineseBooleanConverter))]
         public bool AlignDeclarations
         {
             get { return alignDeclarations; }
@@ -85,6 +89,7 @@ namespace STFormatterVSIX
         [Category("格式化")]
         [DisplayName("保留空行")]
         [Description("格式化时保留现有的空行。")]
+        [TypeConverter(typeof(ChineseBooleanConverter))]
         public bool KeepEmptyLines
         {
             get { return keepEmptyLines; }
@@ -111,7 +116,8 @@ namespace STFormatterVSIX
 
         [Category("格式化")]
         [DisplayName("换行符")]
-        [Description("换行符风格：自动、CRLF 或 LF。")]
+        [Description("换行符风格：自动（跟随原文件）、Windows (CRLF) 或 Unix (LF)。")]
+        [TypeConverter(typeof(ChineseLineEndingConverter))]
         public LineEnding LineEnding
         {
             get { return lineEnding; }
@@ -121,6 +127,7 @@ namespace STFormatterVSIX
         [Category("格式化")]
         [DisplayName("括号内侧空格")]
         [Description("在括号内侧添加空格（例如 ( a ) 与 (a)）。")]
+        [TypeConverter(typeof(ChineseBooleanConverter))]
         public bool ParenInnerSpacing
         {
             get { return parenInnerSpacing; }
@@ -139,6 +146,7 @@ namespace STFormatterVSIX
         [Category("格式化")]
         [DisplayName("语句块前后空行")]
         [Description("在最外层语句块（IF / CASE / FOR / WHILE / REPEAT）前后插入分隔空行。关闭后仅保留源码中已有的空行（受“保留空行”控制）。")]
+        [TypeConverter(typeof(ChineseBooleanConverter))]
         public bool BlankLinesAroundStatementBlocks
         {
             get { return blankLinesAroundStatementBlocks; }
@@ -147,7 +155,8 @@ namespace STFormatterVSIX
 
         [Category("格式化")]
         [DisplayName("类型大小写")]
-        [Description("类型名称的格式：大写、小写或保持原样。")]
+        [Description("类型名称的格式：全部大写、全部小写或保持原样。")]
+        [TypeConverter(typeof(ChineseTypeCaseConverter))]
         public TypeCase TypeCase
         {
             get { return typeCase; }
@@ -157,6 +166,7 @@ namespace STFormatterVSIX
         [Category("行为")]
         [DisplayName("保存时自动格式化")]
         [Description("保存 .TcPOU/.TcDUT/.TcGVL 文件时自动格式化。")]
+        [TypeConverter(typeof(ChineseBooleanConverter))]
         public bool FormatOnSave
         {
             get { return formatOnSave; }
