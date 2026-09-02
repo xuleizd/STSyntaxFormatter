@@ -1,0 +1,13 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.16">
+  <DUT Name="Line_rfid" Id="{6ac9702e-18b1-4dad-90fa-7c75379cd382}">
+    <Declaration><![CDATA[TYPE Line_rfid :
+    STRUCT
+    ID    : LINT;
+    SXBID : STRING(50);
+    ZCID  : STRING(80);
+    END_STRUCT
+END_TYPE
+]]></Declaration>
+  </DUT>
+</TcPlcObject>

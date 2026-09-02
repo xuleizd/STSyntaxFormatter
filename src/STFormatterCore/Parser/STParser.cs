@@ -1272,7 +1272,15 @@ namespace STFormatterCore.Parser
             }
 
             if (Current.Kind == TokenKind.Keyword_EndType)
+            {
                 node.AddToken(Advance()); // END_TYPE
+
+                // TwinCAT also accepts "END_TYPE;". Keep that ';' with the
+                // declaration — otherwise it is parsed as a stray statement and
+                // formatted onto a line of its own.
+                if (Current.Kind == TokenKind.Semicolon)
+                    node.AddToken(Advance());
+            }
 
             return node;
         }

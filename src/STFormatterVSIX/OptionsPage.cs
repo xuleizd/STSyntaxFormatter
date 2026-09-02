@@ -88,7 +88,7 @@ namespace STFormatterVSIX
 
         [Category("格式化")]
         [DisplayName("保留空行")]
-        [Description("格式化时保留现有的空行。")]
+        [Description("是：完整保留代码里的空行，连续多个也按原数量保留。否：2 个以上连续空行合并成 1 个，单个空行不删。")]
         [TypeConverter(typeof(ChineseBooleanConverter))]
         public bool KeepEmptyLines
         {

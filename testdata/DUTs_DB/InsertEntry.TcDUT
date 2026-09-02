@@ -1,0 +1,17 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.16">
+  <DUT Name="InsertEntry" Id="{7efa7597-6552-4bf4-912c-14660d5d59df}">
+    <Declaration><![CDATA[{attribute 'pack_mode' := '1'}
+TYPE InsertEntry :
+    STRUCT
+    JS         : WSTRING(50);
+    FTPBROWSE  : BOOL;
+    FTPDOWN    : BOOL;
+    DATAEXPORT : BOOL;
+    DICTEDIT   : BOOL;
+    CREATETAB  : BOOL;
+    END_STRUCT
+END_TYPE
+]]></Declaration>
+  </DUT>
+</TcPlcObject>

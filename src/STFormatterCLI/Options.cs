@@ -31,7 +31,7 @@ namespace STFormatterCLI
         [Option("align-declarations", Default = true, HelpText = "Align colons in VAR blocks")]
         public bool AlignDeclarations { get; set; }
         
-        [Option("keep-empty-lines", Default = true, HelpText = "Keep empty lines in code")]
+        [Option("keep-empty-lines", Default = true, HelpText = "True: keep every empty line from the source, runs included. False: merge runs of 2+ empty lines into one, keep a lone empty line")]
         public bool KeepEmptyLines { get; set; }
         
         [Option("type-case", Default = "preserve", HelpText = "Type name case: upper, lower, or preserve")]

@@ -231,13 +231,26 @@ namespace STFormatterCoreTests
         }
 
         [Fact]
-        public void KeepEmptyLines_False_SourceBlankLinesRemoved()
+        public void KeepEmptyLines_True_KeepsEveryBlankLineOfARun()
         {
-            var source = "PROGRAM P\nx := 1;\n\ny := 2;\nEND_PROGRAM";
-            var result = Format(source, Lf(new FormatterOptions { KeepEmptyLines = false }));
-            Assert.DoesNotContain("\n\n", result);
-            Assert.Contains("x := 1;", result);
-            Assert.Contains("y := 2;", result);
+            var source = "PROGRAM P\nx := 1;\n\n\n\ny := 2;\nEND_PROGRAM";
+            var result = Format(source, Lf(new FormatterOptions { KeepEmptyLines = true }));
+            Assert.Contains("x := 1;\n\n\n\n    y := 2;", result);
+        }
+
+        [Fact]
+        public void KeepEmptyLines_False_MergesRunsKeepsSingleBlank()
+        {
+            // A lone blank line is kept...
+            var single = "PROGRAM P\nx := 1;\n\ny := 2;\nEND_PROGRAM";
+            var singleResult = Format(single, Lf(new FormatterOptions { KeepEmptyLines = false }));
+            Assert.Contains("x := 1;\n\n    y := 2;", singleResult);
+
+            // ...and a run of three merges down to exactly one.
+            var run = "PROGRAM P\nx := 1;\n\n\n\ny := 2;\nEND_PROGRAM";
+            var runResult = Format(run, Lf(new FormatterOptions { KeepEmptyLines = false }));
+            Assert.Contains("x := 1;\n\n    y := 2;", runResult);
+            Assert.DoesNotContain("\n\n\n", runResult);
         }
 
         #endregion
@@ -392,7 +405,7 @@ namespace STFormatterCoreTests
             var source = "PROGRAM P\nVAR\nx : int;\narr : array[0..1] of bool;\np : pointer to int;\nEND_VAR\nEND_PROGRAM";
             var result = Format(source, Lf(new FormatterOptions { TypeCase = TypeCase.Upper }));
             Assert.Contains("INT", result);
-            Assert.Contains("ARRAY[0 .. 1] OF BOOL", result);
+            Assert.Contains("ARRAY[0..1] OF BOOL", result);
             Assert.Contains("POINTER TO INT", result);
         }
 
@@ -402,7 +415,7 @@ namespace STFormatterCoreTests
             var source = "PROGRAM P\nVAR\nx : INT;\narr : ARRAY[0..1] OF BOOL;\nEND_VAR\nEND_PROGRAM";
             var result = Format(source, Lf(new FormatterOptions { TypeCase = TypeCase.Lower }));
             Assert.Contains("int", result);
-            Assert.Contains("array[0 .. 1] of bool", result);
+            Assert.Contains("array[0..1] of bool", result);
             Assert.DoesNotContain("ARRAY", result);
         }
 

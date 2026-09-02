@@ -1,0 +1,9 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.16">
+  <DUT Name="sss" Id="{69bf82aa-533a-45c6-b8fb-dec09511ed3d}">
+    <Declaration><![CDATA[TYPE sss : DATE_AND_TIME
+;
+END_TYPE
+]]></Declaration>
+  </DUT>
+</TcPlcObject>

@@ -21,6 +21,8 @@ namespace STFormatterCore.Configuration
         // Blank lines
         public int BlankLinesBeforeEnd { get; set; } = 0;
         public int BlankLinesAfterVar { get; set; } = 0;
+        // true: keep every blank line the user typed, runs of two or more included.
+        // false: merge runs of 2+ blank lines into one, never delete a lone blank.
         public bool KeepEmptyLines { get; set; } = true;
         // Separating blank line around outermost statement blocks (IF/CASE/FOR/
         // WHILE/REPEAT). When false, only blank lines present in the source

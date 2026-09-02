@@ -94,16 +94,35 @@ namespace STFormatterCore.Formatter
         }
 
         /// <summary>
-        /// Writes a blank line (two newlines).
+        /// Ensures the output ends with exactly one blank line, adding only the
+        /// line breaks that are still missing. Never stacks on top of a blank line
+        /// that is already there, so a separator inserted by policy cannot grow on
+        /// every formatting run.
         /// </summary>
         public void WriteBlankLine()
         {
-            if (_consecutiveNewlines >= 2) return;
-            _sb.Append(_lineEnding);
-            _sb.Append(_lineEnding);
+            WriteBlankLines(1);
+        }
+
+        /// <summary>
+        /// Ensures the output ends with at least <paramref name="count"/> blank
+        /// lines. Used to carry a run of source blank lines through verbatim —
+        /// KeepEmptyLines=true must not shrink what the user typed.
+        /// </summary>
+        public void WriteBlankLines(int count)
+        {
+            if (count < 1) count = 1;
+
+            int wanted = count + 1; // newlines needed for `count` blank lines
+            int missing = wanted - _consecutiveNewlines;
+            if (missing <= 0) return;
+
+            for (int i = 0; i < missing; i++)
+                _sb.Append(_lineEnding);
+
             _atLineStart = true;
             _indentWritten = false;
-            _consecutiveNewlines = 2;
+            _consecutiveNewlines = wanted;
         }
 
         /// <summary>

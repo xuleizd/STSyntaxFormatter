@@ -1,0 +1,11 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.16">
+  <DUT Name="sdd" Id="{9fd823d0-bf77-4c21-9de1-d351d266d6b8}">
+    <Declaration><![CDATA[TYPE sdd :
+    UNION
+    i : INT;
+    END_UNION
+END_TYPE
+]]></Declaration>
+  </DUT>
+</TcPlcObject>

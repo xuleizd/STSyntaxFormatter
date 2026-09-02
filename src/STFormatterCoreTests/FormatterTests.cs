@@ -769,16 +769,15 @@ namespace STFormatterCoreTests
         [Fact]
         public void KeepEmptyLines_True_PreservesEmptyLines()
         {
-            // TODO: The formatter's VAR block visitor processes VarDeclarations directly
-            // and does not preserve empty lines between declarations. This test verifies
-            // that the formatter at least doesn't crash and produces valid output.
             var options = new FormatterOptions { KeepEmptyLines = true };
             var source = "PROGRAM P\nVAR\nx : INT;\n\ny : INT;\nEND_VAR\nEND_PROGRAM";
             var result = Format(source, options);
-            // Both declarations should be present
-            Assert.Contains("x", result);
-            Assert.Contains("y", result);
-            Assert.Contains("INT", result);
+            var lines = result.Split(new[] { "\r\n", "\n" }, System.StringSplitOptions.None);
+
+            int x = Array.FindIndex(lines, l => l.Trim().StartsWith("x :"));
+            int y = Array.FindIndex(lines, l => l.Trim().StartsWith("y :"));
+            Assert.True(x >= 0 && y > x, "both declarations must survive");
+            Assert.Equal(2, y - x); // the blank line between them is user layout and is kept
         }
 
         #endregion
@@ -786,13 +785,18 @@ namespace STFormatterCoreTests
         #region 35. KeepEmptyLines = false
 
         [Fact]
-        public void KeepEmptyLines_False_RemovesEmptyLines()
+        public void KeepEmptyLines_False_MergesConsecutiveEmptyLines()
         {
             var options = new FormatterOptions { KeepEmptyLines = false };
             var source = "PROGRAM P\nVAR\nx : INT;\n\n\ny : INT;\nEND_VAR\nEND_PROGRAM";
             var result = Format(source, options);
-            // Multiple consecutive blank lines should be collapsed/removed
-            Assert.DoesNotContain("\n\n\n", result);
+            var lines = result.Split(new[] { "\r\n", "\n" }, System.StringSplitOptions.None);
+
+            int x = Array.FindIndex(lines, l => l.Trim().StartsWith("x :"));
+            int y = Array.FindIndex(lines, l => l.Trim().StartsWith("y :"));
+            Assert.True(x >= 0 && y > x, "both declarations must survive");
+            // Two blank lines merge into one — false shrinks runs, it does not delete.
+            Assert.Equal(2, y - x);
         }
 
         #endregion
@@ -961,8 +965,11 @@ namespace STFormatterCoreTests
         {
             var source = "PROGRAM P\nVAR\narr : ARRAY[1..10] OF INT;\nEND_VAR\nEND_PROGRAM";
             var result = Format(source);
-            Assert.Contains("ARRAY", result);
-            Assert.Contains("OF", result);
+            // The subrange '..' stays tight and the brackets hug ARRAY — anything
+            // else ("ARRAY [ 1 .. 10 ]") is not what TwinCAT writes.
+            Assert.Contains("ARRAY[1..10] OF INT", result);
+            Assert.DoesNotContain("1 .. 10", result);
+            Assert.DoesNotContain("ARRAY [", result);
         }
 
         #endregion
@@ -1045,7 +1052,7 @@ namespace STFormatterCoreTests
         }
 
         [Fact]
-        public void RemoveEmptyLines_RemovesSourceBlanksButKeepsBlockSeparators()
+        public void KeepEmptyLines_False_MergesBlankRunsToOne_KeepsBlockSeparators()
         {
             var source =
                 "PROGRAM P\n" +
@@ -1060,12 +1067,14 @@ namespace STFormatterCoreTests
             var result = new STFormatter(options).Format(cst, source);
             var lines = result.Split(new[] { "\r\n", "\n" }, System.StringSplitOptions.None);
 
-            // The VAR block must contain no blank lines.
+            // KeepEmptyLines=false merges runs of 2+ blank lines into one; it never
+            // deletes a lone blank line.
             int varLine = Array.FindIndex(lines, l => l.Trim() == "VAR");
+            int decl = Array.FindIndex(lines, l => l.Trim() == "a : INT;");
             int endVar = Array.FindIndex(lines, l => l.Trim() == "END_VAR");
-            Assert.True(varLine >= 0 && endVar > varLine, "VAR/END_VAR not found");
-            for (int i = varLine + 1; i < endVar; i++)
-                Assert.False(lines[i].Trim().Length == 0, "VAR block must not contain blank lines");
+            Assert.True(varLine >= 0 && decl > varLine && endVar > decl, "VAR/declaration/END_VAR not found");
+            Assert.Equal(1, decl - varLine - 1);   // the single blank after VAR is kept
+            Assert.Equal(1, endVar - decl - 1);    // the run of two blanks merges into one
 
             // The statement block (WHILE) still has its structural separating blank line
             // before it (after END_VAR).
@@ -1167,7 +1176,8 @@ namespace STFormatterCoreTests
             var result = new STFormatter(options).Format(cst, source);
 
             Assert.Contains(": int;", result);
-            Assert.Contains("array[0 .. 5] of", result);
+            // The source's spaced subrange normalizes to the tight canonical form.
+            Assert.Contains("array[0..5] of", result);
             Assert.Contains(": string(200);", result);
             Assert.Contains("I_TcMessage", result);     // library type unchanged
             Assert.DoesNotContain("i_tcmessage", result);
@@ -1177,10 +1187,10 @@ namespace STFormatterCoreTests
 
         #endregion
 
-        #region 51. KeepEmptyLines=false removes source blanks everywhere
+        #region 51. KeepEmptyLines=false merges blank runs, keeps single blanks
 
         [Fact]
-        public void RemoveEmptyLines_StatementArea_NoBlankBeforeEndKeywords()
+        public void KeepEmptyLines_False_KeepsSingleSourceBlankLines()
         {
             var source =
                 "PROGRAM P\n" +
@@ -1202,29 +1212,29 @@ namespace STFormatterCoreTests
             var result = new STFormatter(options).Format(cst, source);
             var lines = result.Split(new[] { "\r\n", "\n" }, System.StringSplitOptions.None);
 
-            // No blank line before END_IF / END_CASE.
-            for (int i = 1; i < lines.Length; i++)
-            {
-                bool endKeyword = lines[i].Trim().Equals("END_IF") || lines[i].Trim().Equals("END_CASE");
-                if (endKeyword)
-                    Assert.False(lines[i - 1].Trim().Length == 0,
-                        $"blank before {lines[i].Trim()} is not allowed when KeepEmptyLines=false");
-            }
+            // A lone source blank line is user layout, not noise: false only merges
+            // runs of two or more, so it survives — including before END_IF/END_CASE.
+            int x = Array.FindIndex(lines, l => l.Trim() == "x := 1;");
+            int endIf = Array.FindIndex(lines, l => l.Trim() == "END_IF");
+            Assert.True(x >= 0 && endIf > x, "IF body not found");
+            Assert.Equal(2, endIf - x);
 
-            // No blank line between the two plain statements inside the CASE branch.
+            int caseLabel = Array.FindIndex(lines, l => l.Trim() == "0:");
             int y = Array.FindIndex(lines, l => l.Trim() == "y := 2;");
             int z = Array.FindIndex(lines, l => l.Trim() == "z := 3;");
-            Assert.True(y >= 0 && z > y, "CASE branch statements not found");
-            Assert.Equal(y + 1, z);
+            int endCase = Array.FindIndex(lines, l => l.Trim() == "END_CASE");
+            Assert.True(caseLabel >= 0 && y > caseLabel && z > y && endCase > z, "CASE branch not found");
+            Assert.Equal(2, y - caseLabel);
+            Assert.Equal(2, z - y);
+            Assert.Equal(1, endCase - z); // no blank in the source here, so none is invented
 
-            // Only blank lines that remain are the structural separators around the
-            // outermost blocks. The first statement (IF) is the first child of the
-            // body, so it gets no leading blank; the block separation appears
-            // between END_IF and CASE.
-            int endIf = Array.FindIndex(lines, l => l.Trim() == "END_IF");
+            // The structural separator between the two outermost blocks stays one blank.
             int caseIdx = Array.FindIndex(lines, l => l.Trim().StartsWith("CASE i"));
-            Assert.True(endIf >= 0 && caseIdx > endIf, "outer IF/CASE not found");
-            Assert.True(caseIdx - endIf == 2, "expected exactly one blank between END_IF and CASE");
+            Assert.True(caseIdx > endIf, "outer IF/CASE not found");
+            Assert.Equal(2, caseIdx - endIf);
+
+            // Nothing anywhere grows into a run of two or more blank lines.
+            Assert.DoesNotContain("\n\n\n", result.Replace("\r\n", "\n"));
         }
 
         [Fact]
@@ -1382,6 +1392,187 @@ namespace STFormatterCoreTests
             var once = Format(source, options);
             var twice = Format(once, options);
             Assert.Equal(once, twice);
+        }
+
+        #endregion
+
+        #region 54. KeepEmptyLines semantics (true keeps every blank, false merges runs)
+
+        /// <summary>
+        /// Counts the blank lines between the lines holding <paramref name="before"/>
+        /// and <paramref name="after"/> (both matched on trimmed text).
+        /// </summary>
+        private static int BlankLinesBetween(string formatted, string before, string after)
+        {
+            var lines = formatted.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None);
+            int from = Array.FindIndex(lines, l => l.Trim() == before);
+            int to = Array.FindIndex(lines, l => l.Trim() == after);
+            Assert.True(from >= 0, $"line '{before}' not found in:\n{formatted}");
+            Assert.True(to > from, $"line '{after}' not found after '{before}' in:\n{formatted}");
+
+            int blanks = 0;
+            for (int i = from + 1; i < to; i++)
+                if (lines[i].Trim().Length == 0) blanks++;
+            return blanks;
+        }
+
+        [Fact]
+        public void KeepEmptyLines_True_KeepsRunOfThreeBlankLines()
+        {
+            var source = "PROGRAM P\nx := 1;\n\n\n\ny := 2;\nEND_PROGRAM";
+            var options = new FormatterOptions { KeepEmptyLines = true, LineEnding = LineEnding.LF };
+            var result = Format(source, options);
+
+            Assert.Equal(3, BlankLinesBetween(result, "x := 1;", "y := 2;"));
+        }
+
+        [Fact]
+        public void KeepEmptyLines_True_RunOfThreeBlankLines_IsIdempotent()
+        {
+            var source = "PROGRAM P\nx := 1;\n\n\n\ny := 2;\nEND_PROGRAM";
+            var options = new FormatterOptions { KeepEmptyLines = true, LineEnding = LineEnding.LF };
+            var once = Format(source, options);
+            var twice = Format(once, options);
+
+            Assert.Equal(once, twice);
+        }
+
+        [Fact]
+        public void KeepEmptyLines_False_MergesRunOfThreeBlankLinesIntoOne()
+        {
+            var source = "PROGRAM P\nx := 1;\n\n\n\ny := 2;\nEND_PROGRAM";
+            var options = new FormatterOptions { KeepEmptyLines = false, LineEnding = LineEnding.LF };
+            var result = Format(source, options);
+
+            Assert.Equal(1, BlankLinesBetween(result, "x := 1;", "y := 2;"));
+        }
+
+        [Fact]
+        public void KeepEmptyLines_False_KeepsLoneBlankLine_IsIdempotent()
+        {
+            var source = "PROGRAM P\nx := 1;\n\ny := 2;\nEND_PROGRAM";
+            var options = new FormatterOptions { KeepEmptyLines = false, LineEnding = LineEnding.LF };
+            var once = Format(source, options);
+
+            Assert.Equal(1, BlankLinesBetween(once, "x := 1;", "y := 2;"));
+            Assert.Equal(once, Format(once, options));
+        }
+
+        [Fact]
+        public void KeepEmptyLines_True_BlankLineHoldingOnlySpaces_CountsAsBlankLine()
+        {
+            // A line with nothing but spaces still reads as a blank line, so it must
+            // survive — counting only consecutive newline trivia used to drop it.
+            var source = "PROGRAM P\nx := 1;\n   \ny := 2;\nEND_PROGRAM";
+            var options = new FormatterOptions { KeepEmptyLines = true, LineEnding = LineEnding.LF };
+            var result = Format(source, options);
+
+            Assert.Equal(1, BlankLinesBetween(result, "x := 1;", "y := 2;"));
+        }
+
+        [Fact]
+        public void KeepEmptyLines_True_BlankBeforeLeadingComment_DoesNotGrowOnReformat()
+        {
+            // The blank belongs to the gap in front of the comment; the newline after
+            // the comment is a different gap. Counting every newline in the token's
+            // leading trivia mixed the two and added one blank line per run.
+            var source = "PROGRAM P\nx := 1;\n\n// note\ny := 2;\nEND_PROGRAM";
+            var options = new FormatterOptions { KeepEmptyLines = true, LineEnding = LineEnding.LF };
+            var once = Format(source, options);
+
+            Assert.Equal(1, BlankLinesBetween(once, "x := 1;", "// note"));
+            Assert.Equal(0, BlankLinesBetween(once, "// note", "y := 2;"));
+
+            var twice = Format(once, options);
+            Assert.Equal(once, twice);
+            Assert.Equal(1, BlankLinesBetween(twice, "x := 1;", "// note"));
+        }
+
+        [Fact]
+        public void KeepEmptyLines_True_BlockSeparatorDoesNotStackOnSourceBlank()
+        {
+            // BlankLinesAroundStatementBlocks inserts a separator around IF/CASE/...
+            // It must top up to one blank line, never add to what the user typed,
+            // or every formatting run would leave another blank line behind.
+            var source =
+                "PROGRAM P\n" +
+                "x := 1;\n" +
+                "\n" +
+                "IF a THEN\n" +
+                "y := 2;\n" +
+                "END_IF\n" +
+                "z := 3;\n" +
+                "END_PROGRAM";
+            var options = new FormatterOptions { KeepEmptyLines = true, LineEnding = LineEnding.LF };
+            var once = Format(source, options);
+
+            Assert.Equal(1, BlankLinesBetween(once, "x := 1;", "IF a THEN"));
+            Assert.Equal(1, BlankLinesBetween(once, "END_IF", "z := 3;"));
+            Assert.Equal(once, Format(once, options));
+        }
+
+        [Fact]
+        public void KeepEmptyLines_True_UserRunBeforeBlockSurvivesSeparator()
+        {
+            // A run the user typed in front of a statement block wins over the single
+            // separator blank line the policy would add.
+            var source =
+                "PROGRAM P\n" +
+                "x := 1;\n" +
+                "\n" +
+                "\n" +
+                "\n" +
+                "IF a THEN\n" +
+                "y := 2;\n" +
+                "END_IF\n" +
+                "END_PROGRAM";
+            var options = new FormatterOptions { KeepEmptyLines = true, LineEnding = LineEnding.LF };
+            var once = Format(source, options);
+
+            Assert.Equal(3, BlankLinesBetween(once, "x := 1;", "IF a THEN"));
+            Assert.Equal(once, Format(once, options));
+        }
+
+        [Fact]
+        public void KeepEmptyLines_False_RunBeforeBlockMergesToOne()
+        {
+            var source =
+                "PROGRAM P\n" +
+                "x := 1;\n" +
+                "\n" +
+                "\n" +
+                "\n" +
+                "IF a THEN\n" +
+                "y := 2;\n" +
+                "END_IF\n" +
+                "END_PROGRAM";
+            var options = new FormatterOptions { KeepEmptyLines = false, LineEnding = LineEnding.LF };
+            var once = Format(source, options);
+
+            Assert.Equal(1, BlankLinesBetween(once, "x := 1;", "IF a THEN"));
+            Assert.Equal(once, Format(once, options));
+        }
+
+        [Fact]
+        public void KeepEmptyLines_True_BlankLinesInsideVarBlockRunPreserved()
+        {
+            var source = "PROGRAM P\nVAR\nx : INT;\n\n\n\ny : INT;\nEND_VAR\nEND_PROGRAM";
+            var options = new FormatterOptions { KeepEmptyLines = true, LineEnding = LineEnding.LF };
+            var result = Format(source, options);
+
+            Assert.Contains("x : INT;\n\n\n\n    y : INT;", result);
+        }
+
+        [Fact]
+        public void KeepEmptyLines_True_BareImplementationBlankLinesPreserved()
+        {
+            // The VSIX hands an implementation body over without any POU header.
+            var source = "x := 1;\n\n\ny := 2;\n";
+            var options = new FormatterOptions { KeepEmptyLines = true, LineEnding = LineEnding.LF };
+            var once = Format(source, options);
+
+            Assert.Equal("x := 1;\n\n\ny := 2;\n", once);
+            Assert.Equal(once, Format(once, options));
         }
 
         #endregion

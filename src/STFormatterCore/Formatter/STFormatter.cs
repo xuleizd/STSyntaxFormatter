@@ -48,10 +48,9 @@ namespace STFormatterCore.Formatter
 
             var result = RemoveTrailingWhitespace(_output.Build());
 
-            // Normalize blank lines. When KeepEmptyLines is false, remove all blank
-            // lines (TcBlack's removeEmptyLines behaviour). When true, collapse runs
-            // of 3+ blank lines into at most one so the formatter is a fixed point
-            // and re-running it cannot keep accumulating blank lines.
+            // Blank-line policy. KeepEmptyLines=true keeps every blank line the user
+            // typed, count included; false merges runs of 2+ blank lines into one but
+            // never deletes a lone blank line.
             result = NormalizeBlankLines(result);
 
             // (MaxLineLength wrapping happens inside WriteExpressionTokens so it is
@@ -601,10 +600,12 @@ namespace STFormatterCore.Formatter
                     var prevTypeTok = typeTokens[j - 1];
                     // No space before/after ( [ ) ] for string length specs like WSTRING(255)
                     // No space around . for dotted type names like Tc3_EventLogger.I_TcResultEvent
+                    // No space around .. for subranges like ARRAY[1..10] OF INT
                     if (tok.Kind == TokenKind.LeftParen || tok.Kind == TokenKind.LeftBracket ||
                         prevTypeTok.Kind == TokenKind.LeftParen || prevTypeTok.Kind == TokenKind.LeftBracket ||
                         tok.Kind == TokenKind.RightParen || tok.Kind == TokenKind.RightBracket ||
-                        tok.Kind == TokenKind.Dot || prevTypeTok.Kind == TokenKind.Dot)
+                        tok.Kind == TokenKind.Dot || prevTypeTok.Kind == TokenKind.Dot ||
+                        tok.Kind == TokenKind.DotDot || prevTypeTok.Kind == TokenKind.DotDot)
                     {
                         // No space
                     }
@@ -750,11 +751,11 @@ namespace STFormatterCore.Formatter
         /// Writes a node's tokens preserving every token's original text and its
         /// comments exactly as they appeared in the source. Line layout follows the
         /// formatter's policies: continuation lines are re-indented at the current
-        /// level, and with KeepEmptyLines=false runs of source newlines collapse to
-        /// a single line break — but separate source lines are NEVER merged and
-        /// intra-line whitespace is NEVER dropped. Merging lines would let a '//'
-        /// comment swallow the code that follows it, and dropping spaces glues
-        /// tokens together until the code no longer compiles.
+        /// level, and blank lines in the source follow the KeepEmptyLines policy —
+        /// but separate source lines are NEVER merged and intra-line whitespace is
+        /// NEVER dropped. Merging lines would let a '//' comment swallow the code
+        /// that follows it, and dropping spaces glues tokens together until the code
+        /// no longer compiles.
         /// </summary>
         private void WriteTokensVerbatim(System.Collections.Generic.IEnumerable<Token> tokens)
         {
@@ -800,8 +801,10 @@ namespace STFormatterCore.Formatter
                 if (pendingNewlines == 0) return;
                 if (emittedContent)
                 {
-                    int count = _options.KeepEmptyLines ? pendingNewlines : 1;
-                    for (int i = 0; i < count; i++)
+                    int blanks = SourceBlankLines(pendingNewlines);
+                    if (blanks > 0)
+                        _output.WriteBlankLines(blanks);
+                    else
                         _output.WriteLine();
                     _output.WriteIndent(_indent.CurrentIndent);
                 }
@@ -1096,25 +1099,14 @@ namespace STFormatterCore.Formatter
         }
 
         /// <summary>
-        /// Writes a blank line before a clause keyword (ELSIF/ELSE/END_IF) if the original
-        /// source had a blank line there, to preserve intentional spacing.
+        /// Writes the blank lines the original source had before a clause keyword
+        /// (ELSIF/ELSE/END_IF), to preserve intentional spacing.
         /// </summary>
         private void WriteClauseBlankLineIfNeeded(Token clauseToken)
         {
-            if (clauseToken?.LeadingTrivia == null) return;
-            // Only preserve a source blank line before a clause keyword when blank
-            // lines are being kept. With KeepEmptyLines=false the blank is dropped
-            // (statement-block separators are emitted separately, not here).
-            if (!_options.KeepEmptyLines) return;
-            int newlineCount = 0;
-            foreach (var trivia in clauseToken.LeadingTrivia)
-            {
-                if (trivia.Kind == TriviaKind.NewLine)
-                    newlineCount++;
-            }
-            // 2+ newlines in leading trivia means there was a blank line in source
-            if (newlineCount >= 2)
-                _output.WriteBlankLine();
+            int blanks = SourceBlankLines(LeadingBlankLineRun(clauseToken));
+            if (blanks > 0)
+                _output.WriteBlankLines(blanks);
         }
 
         /// <summary>
@@ -1587,23 +1579,20 @@ namespace STFormatterCore.Formatter
         }
 
         /// <summary>
-        /// Emits a source blank line that precedes a statement. The lexer attaches
+        /// Emits the source blank lines that precede a statement. The lexer attaches
         /// the blank as 2+ consecutive NewLine trivia on the statement's first
         /// token, but statement tokens go through WriteExpressionTokens which
-        /// skips newline trivia — so without this the blank line would be lost
-        /// even with KeepEmptyLines=true. LineBuilder deduplicates consecutive
-        /// blank lines, so separators added by other policies cannot stack up.
+        /// skips newline trivia — so without this the blank line would be lost.
+        /// LineBuilder only tops up to the requested count, so a separator added by
+        /// another policy cannot stack on top of these and grow on every run.
         /// </summary>
         private void WriteStatementBlankLineIfNeeded(List<Token> tokens)
         {
-            if (!_options.KeepEmptyLines) return;
-            if (tokens.Count == 0 || tokens[0].LeadingTrivia == null) return;
-            int newlines = 0;
-            foreach (var trivia in tokens[0].LeadingTrivia)
-                if (trivia.Kind == TriviaKind.NewLine)
-                    newlines++;
-            if (newlines >= 2)
-                _output.WriteBlankLine();
+            if (tokens.Count == 0) return;
+
+            int blanks = SourceBlankLines(LeadingBlankLineRun(tokens[0]));
+            if (blanks > 0)
+                _output.WriteBlankLines(blanks);
         }
 
         /// <summary>
@@ -1793,28 +1782,37 @@ namespace STFormatterCore.Formatter
 
             // Write TYPE keyword
             Token endTypeToken = null;
-            Token semicolonToken = null;
-            bool wroteFirst = false;
+            int endTypeIndex = -1;
+            Token prev = null;
 
-            foreach (var tok in node.Tokens)
+            for (int i = 0; i < node.Tokens.Count; i++)
             {
+                var tok = node.Tokens[i];
+
                 if (tok.Kind == TokenKind.Keyword_EndType)
                 {
                     endTypeToken = tok;
+                    endTypeIndex = i;
                     break;
-                }
-
-                // The terminating ';' of an enum (TYPE x : (a,b,c);) comes AFTER
-                // the body in source order — save it and write it after children.
-                if (tok.Kind == TokenKind.Semicolon)
-                {
-                    semicolonToken = tok;
-                    continue;
                 }
 
                 WriteLeadingTrivia(tok);
 
-                if (wroteFirst)
+                // A type alias (TYPE sss : DATE_AND_TIME;) ends with ';' on the
+                // header line. Deferring it — as an enum's ';' used to need — puts
+                // the semicolon alone on the next line. ParseEnumBody consumes the
+                // enum's own ';' now, so every ';' seen here belongs to the header.
+                if (tok.Kind == TokenKind.Semicolon)
+                {
+                    _output.Write(";");
+                    prev = tok;
+                    continue;
+                }
+
+                // Alias headers carry type tokens (ARRAY[1..10] OF INT, STRING(50)),
+                // so spacing has to follow the same rules as everywhere else —
+                // a hardcoded space turns them into "ARRAY [ 1 .. 10 ] OF INT".
+                if (NeedsSpaceBefore(tok, prev, _options))
                     _output.Write(" ");
 
                 if (tok.Kind == TokenKind.Keyword_Type)
@@ -1824,37 +1822,31 @@ namespace STFormatterCore.Formatter
                 else
                     _output.Write(tok.Text);
 
-                wroteFirst = true;
+                prev = tok;
             }
 
             _output.WriteLine();
 
-            // Visit body (STRUCT/ENUM/UNION)
-            using (_indent.Push())
-            {
-                VisitStatementList(node.Children);
-            }
-
-            // Write the enum ';' after the body, before END_TYPE
-            if (semicolonToken != null)
-            {
-                WriteLeadingTrivia(semicolonToken);
-                _output.Write(";");
-                WriteTrailingTrivia(semicolonToken);
-                _output.WriteLine();
-            }
+            // Visit body (STRUCT/ENUM/UNION). The body opener sits flush with TYPE —
+            // TwinCAT does not indent STRUCT/UNION/'(' under the TYPE header — and
+            // each body visitor indents its own members one level.
+            VisitStatementList(node.Children);
 
             // Blank lines before END_TYPE
             for (int i = 0; i < _options.BlankLinesBeforeEnd; i++)
                 _output.WriteLine();
 
-            // Write END_TYPE
+            // Write END_TYPE, keeping a terminating ';' (END_TYPE;) on the same line
             if (endTypeToken != null)
             {
                 WriteLeadingTrivia(endTypeToken);
                 _output.WriteIndent(_indent.CurrentIndent);
                 _output.WriteKeyword("END_TYPE");
                 WriteTrailingTrivia(endTypeToken);
+
+                if (endTypeIndex + 1 < node.Tokens.Count &&
+                    node.Tokens[endTypeIndex + 1].Kind == TokenKind.Semicolon)
+                    _output.Write(";");
             }
             _output.WriteLine();
         }
@@ -1882,13 +1874,17 @@ namespace STFormatterCore.Formatter
                 }
             }
 
-            // Visit members
-            foreach (var child in node.Children)
+            // Members sit one level deeper than STRUCT/END_STRUCT (UNION/END_UNION),
+            // which stay flush with the enclosing TYPE header.
+            using (_indent.Push())
             {
-                if (child is VarDeclaration vd)
-                    VisitVarDeclaration(vd, maxNameLen);
-                else
-                    Visit(child);
+                foreach (var child in node.Children)
+                {
+                    if (child is VarDeclaration vd)
+                        VisitVarDeclaration(vd, maxNameLen);
+                    else
+                        Visit(child);
+                }
             }
 
             // Write END_STRUCT
@@ -1916,11 +1912,11 @@ namespace STFormatterCore.Formatter
             // them into a single `( a, b, c )` line loses the original layout and,
             // worse, the per-token LeadingTrivia (newlines) interacts with the
             // inline writer below producing blank-line drift and stray semicolons.
-            // When the original is multi-line, preserve it verbatim — the same
-            // "don't touch what you can't safely reformat" policy as TcBlack.
+            // So keep the source line breaks and only normalize the indentation —
+            // the same "don't reflow what you can't safely reflow" policy as TcBlack.
             if (HasNewlineTrivia(node.Tokens))
             {
-                WriteTokensVerbatim(node.Tokens);
+                WriteEnumBodyPreservingLayout(node);
                 _output.WriteLine();
                 return;
             }
@@ -1952,6 +1948,57 @@ namespace STFormatterCore.Formatter
             }
 
             _output.WriteLine();
+        }
+
+        /// <summary>
+        /// Writes a multi-line enum body keeping the source line breaks but not its
+        /// indentation: '(' and the closing ')' (plus an optional ": base" and the
+        /// terminating ';') sit at the TYPE declaration's indent while the values go
+        /// one level deeper, so "TYPE x :" / "(" / "    a := 0" / ");" comes out the
+        /// same no matter how the source was indented.
+        /// </summary>
+        private void WriteEnumBodyPreservingLayout(EnumBody node)
+        {
+            int close = -1;
+            for (int i = node.Tokens.Count - 1; i >= 0; i--)
+            {
+                if (node.Tokens[i].Kind == TokenKind.RightParen)
+                {
+                    close = i;
+                    break;
+                }
+            }
+
+            // No ')' to hang the layout off (unbalanced source) — fall back to the
+            // old verbatim dump rather than inventing structure.
+            if (close < 0)
+            {
+                WriteTokensVerbatim(node.Tokens);
+                return;
+            }
+
+            var open = node.Tokens[0];
+            _output.Write("(");
+
+            using (_indent.Push())
+                WriteTokensVerbatim(node.Tokens.Skip(1).Take(close - 1), open.TrailingTrivia);
+
+            _output.WriteLine();
+            _output.WriteIndent(_indent.CurrentIndent);
+            for (int i = close; i < node.Tokens.Count; i++)
+            {
+                var tok = node.Tokens[i];
+                if (tok.Kind == TokenKind.RightParen)
+                    _output.Write(")");
+                else if (tok.Kind == TokenKind.Semicolon)
+                    _output.Write(";");
+                else if (tok.Kind == TokenKind.BadToken && tok.Text == ":")
+                    _output.Write(" :");
+                else
+                    _output.Write(" " + tok.Text);
+
+                WriteTrailingTrivia(tok);
+            }
         }
 
         /// <summary>
@@ -1993,13 +2040,17 @@ namespace STFormatterCore.Formatter
                 }
             }
 
-            // Visit members
-            foreach (var child in node.Children)
+            // Members sit one level deeper than STRUCT/END_STRUCT (UNION/END_UNION),
+            // which stay flush with the enclosing TYPE header.
+            using (_indent.Push())
             {
-                if (child is VarDeclaration vd)
-                    VisitVarDeclaration(vd, maxNameLen);
-                else
-                    Visit(child);
+                foreach (var child in node.Children)
+                {
+                    if (child is VarDeclaration vd)
+                        VisitVarDeclaration(vd, maxNameLen);
+                    else
+                        Visit(child);
+                }
             }
 
             // Write END_UNION
@@ -2241,6 +2292,43 @@ namespace STFormatterCore.Formatter
         #region Trivia Handling
 
         /// <summary>
+        /// Converts a run of <paramref name="sourceNewlines"/> newline trivia into the
+        /// number of blank lines to emit: two newlines mean one blank line, since the
+        /// first only ends the previous source line. KeepEmptyLines=true keeps the
+        /// user's count; false merges any run into a single blank line.
+        /// </summary>
+        private int SourceBlankLines(int sourceNewlines)
+        {
+            int blanks = sourceNewlines - 1;
+            if (blanks <= 0) return 0;
+            return _options.KeepEmptyLines ? blanks : 1;
+        }
+
+        /// <summary>
+        /// Counts the newlines that separate <paramref name="token"/> from whatever
+        /// came before it, stopping at the first comment: a blank line belongs to the
+        /// gap in front of that comment, and the newlines after it are a different gap.
+        /// Whitespace trivia is skipped, so a line holding only spaces still counts as
+        /// the blank line it looks like.
+        /// </summary>
+        private static int LeadingBlankLineRun(Token token)
+        {
+            if (token?.LeadingTrivia == null) return 0;
+
+            int newlines = 0;
+            foreach (var trivia in token.LeadingTrivia)
+            {
+                if (trivia.Kind == TriviaKind.NewLine)
+                    newlines++;
+                else if (trivia.Kind == TriviaKind.SingleLineComment ||
+                         trivia.Kind == TriviaKind.MultiLineComment)
+                    break;
+            }
+
+            return newlines;
+        }
+
+        /// <summary>
         /// Writes leading trivia (comments, newlines) before a token.
         /// </summary>
         private void WriteLeadingTrivia(Token token)
@@ -2248,36 +2336,31 @@ namespace STFormatterCore.Formatter
             if (token.LeadingTrivia == null || token.LeadingTrivia.Count == 0)
                 return;
 
+            int pendingNewlines = 0;
+
+            // Emits the blank lines of the gap that just ended — either at a comment
+            // or, when the trivia runs out, in front of the token itself.
+            void FlushBlankLines()
+            {
+                int blanks = SourceBlankLines(pendingNewlines);
+                pendingNewlines = 0;
+                if (blanks <= 0) return;
+
+                _output.WriteBlankLines(blanks);
+                // The blank lines put us on a fresh line, so re-apply the indent —
+                // otherwise whatever follows would start at column 0.
+                _output.WriteIndent(_indent.CurrentIndent);
+            }
+
             foreach (var trivia in token.LeadingTrivia)
             {
                 switch (trivia.Kind)
                 {
                     case TriviaKind.NewLine:
                         // A lone newline is the structural line break written by the
-                        // visit methods, so it must not be re-emitted here. But two
-                        // or more consecutive newlines mean an *intentional blank
-                        // line* in the source; preserve it only when KeepEmptyLines
-                        // is true (that option means "keep existing blank lines",
-                        // not "add new ones"). After the blank line the following
-                        // token starts a new line, so re-apply the current indent —
-                        // otherwise the token would start at column 0.
-                        if (_options.KeepEmptyLines)
-                        {
-                            int newlines = 1;
-                            int idx = token.LeadingTrivia.IndexOf(trivia);
-                            for (int k = idx + 1; k < token.LeadingTrivia.Count; k++)
-                            {
-                                if (token.LeadingTrivia[k].Kind == TriviaKind.NewLine)
-                                    newlines++;
-                                else
-                                    break;
-                            }
-                            if (newlines >= 2)
-                            {
-                                _output.WriteBlankLine();
-                                _output.WriteIndent(_indent.CurrentIndent);
-                            }
-                        }
+                        // visit methods, so it must not be re-emitted here. Two or
+                        // more mean an intentional blank line in the source.
+                        pendingNewlines++;
                         break;
                     case TriviaKind.SingleLineComment:
                     case TriviaKind.MultiLineComment:
@@ -2286,6 +2369,7 @@ namespace STFormatterCore.Formatter
                         // indent, end the line, and re-indent so the token itself
                         // keeps its indentation (otherwise the token would start the
                         // next line at column 0).
+                        FlushBlankLines();
                         if (_output.IsAtLineStart)
                             _output.WriteIndent(_indent.CurrentIndent);
                         _output.Write(trivia.Text);
@@ -2296,6 +2380,8 @@ namespace STFormatterCore.Formatter
                         break;
                 }
             }
+
+            FlushBlankLines();
         }
 
         /// <summary>
@@ -2358,8 +2444,10 @@ namespace STFormatterCore.Formatter
             if (current.Kind == TokenKind.Semicolon)
                 return false;
 
-            // No space around dot
-            if (current.Kind == TokenKind.Dot || previous.Kind == TokenKind.Dot)
+            // No space around dot, and around '..' (subrange): Tc3_EventLogger.I_TcResultEvent,
+            // ARRAY[1..10] OF INT
+            if (current.Kind == TokenKind.Dot || previous.Kind == TokenKind.Dot ||
+                current.Kind == TokenKind.DotDot || previous.Kind == TokenKind.DotDot)
                 return false;
 
             // No space around '#' (enum value access E_Mode#Running, typed
@@ -2377,7 +2465,9 @@ namespace STFormatterCore.Formatter
                 return false;
 
             // No space before [ when preceded by Identifier (array access): arr[0] not arr [0]
-            if (current.Kind == TokenKind.LeftBracket && previous.Kind == TokenKind.Identifier)
+            // or by ARRAY (array type spec): ARRAY[1..10] not ARRAY [1..10]
+            if (current.Kind == TokenKind.LeftBracket &&
+                (previous.Kind == TokenKind.Identifier || previous.Kind == TokenKind.Keyword_Array))
                 return false;
 
             // No space before [ when preceded by RightBracket (multi-dimensional): arr[0][1]
@@ -2483,17 +2573,18 @@ namespace STFormatterCore.Formatter
         }
 
         /// <summary>
-        /// Collapses runs of blank lines to at most one (idempotent fixed point).
-        /// Blank-line *removal* for KeepEmptyLines=false happens earlier, at emit
-        /// time: source blank lines are only written when KeepEmptyLines is true,
-        /// while structural blank lines around statement blocks (IF/CASE/FOR/
-        /// WHILE/REPEAT) are always written. So this pass only needs to dedup.
+        /// Blank-line policy pass. With KeepEmptyLines=true the text is returned
+        /// untouched: every blank line the user typed survives, including runs of
+        /// two or more. With false, runs of 2+ blank lines merge into a single blank
+        /// line while a lone blank line is kept. Source blank lines already carry the
+        /// policy from emit time (see <see cref="SourceBlankLines"/>); this pass is
+        /// the catch-all for blank lines produced by several policies meeting.
         /// </summary>
         private string NormalizeBlankLines(string text)
         {
             if (string.IsNullOrEmpty(text)) return text;
+            if (_options.KeepEmptyLines) return text;
 
-            // Collapse runs of blank lines to at most one (idempotent).
             var lines = text.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None);
             var collapsed = new System.Collections.Generic.List<string>();
             int consecutiveEmpty = 0;
@@ -2503,7 +2594,7 @@ namespace STFormatterCore.Formatter
                 if (empty)
                 {
                     consecutiveEmpty++;
-                    if (consecutiveEmpty > 1) continue; // drop extra blank line
+                    if (consecutiveEmpty > 1) continue; // merge the run into one blank line
                 }
                 else
                 {
@@ -2511,9 +2602,8 @@ namespace STFormatterCore.Formatter
                 }
                 collapsed.Add(line);
             }
-            text = string.Join(_lineEnding, collapsed);
 
-            return text;
+            return string.Join(_lineEnding, collapsed);
         }
 
         #endregion
