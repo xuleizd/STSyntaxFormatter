@@ -1914,37 +1914,35 @@ namespace STFormatterCore.Formatter
             // inline writer below producing blank-line drift and stray semicolons.
             // So keep the source line breaks and only normalize the indentation —
             // the same "don't reflow what you can't safely reflow" policy as TcBlack.
-            if (HasNewlineTrivia(node.Tokens))
+            if (EnumBodySpansMultipleLines(node.Tokens))
             {
                 WriteEnumBodyPreservingLayout(node);
                 _output.WriteLine();
                 return;
             }
 
-            // Single-line enum: ( value1, value2, ... )
+            // Single-line enum: (value1 := 0, value2) [: base] ;
+            // Spacing has to come from the shared rules — writing the tokens
+            // back-to-back turns this into "(Small:=1, Big:=2):INT;".
+            Token prev = null;
             for (int i = 0; i < node.Tokens.Count; i++)
             {
                 var tok = node.Tokens[i];
                 WriteLeadingTrivia(tok);
 
-                if (tok.Kind == TokenKind.LeftParen)
-                {
-                    _output.Write("(");
-                    continue;
-                }
-                if (tok.Kind == TokenKind.RightParen)
-                {
-                    _output.Write(")");
-                    continue;
-                }
-                if (tok.Kind == TokenKind.Comma)
-                {
-                    _output.Write(", ");
-                    continue;
-                }
+                if (prev != null && NeedsSpaceBefore(tok, prev, _options))
+                    _output.Write(" ");
 
-                // Write enum value or type token
-                WriteTokenFormatted(tok);
+                if (tok.Kind == TokenKind.LeftParen)
+                    _output.Write("(");
+                else if (tok.Kind == TokenKind.RightParen)
+                    _output.Write(")");
+                else if (tok.Kind == TokenKind.Comma)
+                    _output.Write(",");
+                else
+                    WriteTokenFormatted(tok); // enum value or base type token
+
+                prev = tok;
             }
 
             _output.WriteLine();
@@ -2002,17 +2000,22 @@ namespace STFormatterCore.Formatter
         }
 
         /// <summary>
-        /// True when any token carries a newline in its leading/trailing trivia,
-        /// meaning the construct spans multiple physical lines in the source.
+        /// True when the enum body itself is written over several lines. The newlines
+        /// around it don't count: the break after "TYPE x :" sits in the first token's
+        /// leading trivia and the break before END_TYPE in the last token's trailing
+        /// trivia, and treating either as a layout break makes an already formatted
+        /// single-line enum look multi-line on the next pass.
         /// </summary>
-        private static bool HasNewlineTrivia(System.Collections.Generic.IEnumerable<Token> tokens)
+        private static bool EnumBodySpansMultipleLines(System.Collections.Generic.IList<Token> tokens)
         {
-            foreach (var tok in tokens)
+            for (int i = 0; i < tokens.Count; i++)
             {
-                foreach (var t in tok.LeadingTrivia)
-                    if (t.Kind == TriviaKind.NewLine) return true;
-                foreach (var t in tok.TrailingTrivia)
-                    if (t.Kind == TriviaKind.NewLine) return true;
+                if (i > 0)
+                    foreach (var t in tokens[i].LeadingTrivia)
+                        if (t.Kind == TriviaKind.NewLine) return true;
+                if (i < tokens.Count - 1)
+                    foreach (var t in tokens[i].TrailingTrivia)
+                        if (t.Kind == TriviaKind.NewLine) return true;
             }
             return false;
         }

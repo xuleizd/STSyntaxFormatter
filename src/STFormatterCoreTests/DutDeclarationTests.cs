@@ -142,6 +142,28 @@ namespace STFormatterCoreTests
         }
 
         [Fact]
+        public void EnumBody_SingleLine_StaysOnOneLine()
+        {
+            // The break before END_TYPE sits in the ';' trailing trivia. Counting it
+            // as part of the enum's own layout made the second pass break ')' onto a
+            // line of its own.
+            AssertLayout(
+                "TYPE E_Color : (Red, Green, Blue);\nEND_TYPE\n",
+                "TYPE E_Color :\n(Red, Green, Blue);\nEND_TYPE\n");
+        }
+
+        [Fact]
+        public void EnumBody_SingleLineWithBaseType_KeepsOperatorSpacing()
+        {
+            const string expected =
+                "TYPE E_Size :\n(Small := 1, Big := 2) : INT;\nEND_TYPE\n";
+
+            AssertLayout("TYPE E_Size : (Small := 1, Big := 2) : INT;\nEND_TYPE\n", expected);
+            // A source that lost its spacing is repaired to the same layout.
+            AssertLayout("TYPE E_Size : (Small:=1, Big:=2):INT;\nEND_TYPE\n", expected);
+        }
+
+        [Fact]
         public void TypeHeader_ExtraSpacesBeforeColon_Collapse()
         {
             AssertLayout(
