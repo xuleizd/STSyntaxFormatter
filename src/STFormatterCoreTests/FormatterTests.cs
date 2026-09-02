@@ -1319,14 +1319,16 @@ namespace STFormatterCoreTests
         #region 53. Bare implementation body (statements without a POU header)
 
         [Fact]
-        public void BareImplementation_StatementsIndentedOneLevel()
+        public void BareImplementation_OutermostStatementsAtColumnZero()
         {
             var source = "x := 1;\nIF a THEN\ny := 2;\nEND_IF\n";
             var result = Format(source, new FormatterOptions { LineEnding = LineEnding.LF });
-            Assert.Contains("    x := 1;", result);
-            Assert.Contains("    IF a THEN", result);
-            Assert.Contains("        y := 2;", result);
-            Assert.Contains("    END_IF", result);
+            Assert.StartsWith("x := 1;", result);
+            Assert.Contains("\nIF a THEN", result);
+            Assert.Contains("\n    y := 2;", result);
+            Assert.Contains("\nEND_IF", result);
+            Assert.DoesNotContain("\n    x := 1;", result);
+            Assert.DoesNotContain("\n    IF a THEN", result);
         }
 
         [Fact]
@@ -1334,22 +1336,23 @@ namespace STFormatterCoreTests
         {
             var source = "CASE step OF\n0:\nx := 1;\n10:\nIF a THEN\ny := 2;\nEND_IF\nEND_CASE\n";
             var result = Format(source, new FormatterOptions { LineEnding = LineEnding.LF });
-            Assert.Contains("    CASE step OF", result);
-            Assert.Contains("        0:", result);
-            Assert.Contains("            x := 1;", result);
-            Assert.Contains("        10:", result);
-            Assert.Contains("            IF a THEN", result);
-            Assert.Contains("                y := 2;", result);
-            Assert.Contains("            END_IF", result);
-            Assert.Contains("    END_CASE", result);
+            Assert.StartsWith("CASE step OF", result);
+            Assert.Contains("\n    0:", result);
+            Assert.Contains("\n        x := 1;", result);
+            Assert.Contains("\n    10:", result);
+            Assert.Contains("\n        IF a THEN", result);
+            Assert.Contains("\n            y := 2;", result);
+            Assert.Contains("\n        END_IF", result);
+            Assert.Contains("\nEND_CASE", result);
         }
 
         [Fact]
-        public void BareImplementation_MatchesWrappedProgramOutput()
+        public void BareImplementation_MatchesDedentedProgramBody()
         {
-            // The VSIX formats ImplementationText bare; the CLI wraps it in
-            // PROGRAM __Temp__ ... END_PROGRAM and strips the wrapper afterwards.
-            // Both paths must produce the same text.
+            // A bare implementation body must format exactly like the same
+            // statements inside PROGRAM ... END_PROGRAM with the wrapper's one
+            // indent level removed — that is the TwinCAT layout where outermost
+            // implementation code sits at column 0.
             var bare =
                 "fb.Execute(a := 1);\n" +
                 "IF x THEN\ny := 2;\nEND_IF\n" +
@@ -1365,7 +1368,8 @@ namespace STFormatterCoreTests
                 lines.RemoveAt(lines.Count - 1);
             Assert.Equal("END_PROGRAM", lines[lines.Count - 1].Trim());
             lines.RemoveAt(lines.Count - 1);
-            var expected = string.Join("\n", lines) + "\n";
+            var dedented = lines.Select(l => l.StartsWith("    ") ? l.Substring(4) : l).ToList();
+            var expected = string.Join("\n", dedented) + "\n";
 
             Assert.Equal(expected, bareResult);
         }

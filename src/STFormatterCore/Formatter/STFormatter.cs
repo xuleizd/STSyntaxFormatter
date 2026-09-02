@@ -112,17 +112,52 @@ namespace STFormatterCore.Formatter
 
         private void VisitCompilationUnit(CompilationUnit node)
         {
-            // Top-level children of a compilation unit (a full POU/METHOD text, or a
-            // bare implementation whose statements are parsed at the root). Same
-            // sibling handling as a POU body: statement children are indented one
-            // level and get a separating blank line around them (max one between
-            // neighbours); declaration-scope children stay at column 0. This makes a
-            // bare implementation body format exactly like the CLI path that wraps it
-            // in PROGRAM __Temp__ ... END_PROGRAM and strips the wrapper afterwards.
-            VisitBodyChildren(node.Children);
+            // A bare implementation body (statements parsed at the compilation-unit
+            // root — TwinCAT hands the implementation text of a POU/METHOD over
+            // without any header) has no enclosing scope, so its outermost
+            // statements stay at column 0 and only nested bodies indent. A document
+            // with declaration-scope children (PROGRAM/METHOD header, VAR blocks,
+            // TYPE/NAMESPACE/USING) keeps the POU-body rules where statements are
+            // indented one level under their header.
+            bool bareImplementation = IsBareImplementation(node.Children);
+            VisitBodyChildren(node.Children, bareImplementation);
 
             // Handle EOF trivia (trailing comments at end of file)
             // The parser doesn't store EOF, but any trailing trivia is on the last child
+        }
+
+        /// <summary>
+        /// True when the children are a bare statement list: at least one statement
+        /// (or unparsed chunk) and no declaration-scope node. Such a compilation
+        /// unit is implementation-only text with no header to indent under.
+        /// </summary>
+        private static bool IsBareImplementation(System.Collections.Generic.IList<SyntaxNode> children)
+        {
+            bool hasStatement = false;
+            foreach (var child in children)
+            {
+                switch (child)
+                {
+                    case IfStatement _:
+                    case CaseStatement _:
+                    case ForStatement _:
+                    case WhileStatement _:
+                    case RepeatStatement _:
+                    case AssignmentStatement _:
+                    case ExpressionStatement _:
+                        hasStatement = true;
+                        break;
+                    case VarBlock _:
+                    case DeclarationBlock _:
+                    case MethodDeclaration _:
+                    case PropertyDeclaration _:
+                    case TypeDeclaration _:
+                    case NamespaceDeclaration _:
+                    case UsingDirective _:
+                        return false;
+                }
+            }
+            return hasStatement;
         }
 
         #endregion
@@ -136,7 +171,7 @@ namespace STFormatterCore.Formatter
         /// TYPE/NAMESPACE/USING declarations — are written at the current indent so
         /// they line up with their parent header, exactly as TwinCAT lays them out.
         /// </summary>
-        private void VisitBodyChild(SyntaxNode child)
+        private void VisitBodyChild(SyntaxNode child, bool bareImplementation)
         {
             bool isStatement =
                 child is IfStatement ||
@@ -148,7 +183,7 @@ namespace STFormatterCore.Formatter
                 child is ExpressionStatement ||
                 child is UnknownNode;
 
-            if (isStatement)
+            if (isStatement && !bareImplementation)
             {
                 using (_indent.Push())
                     Visit(child);
@@ -162,9 +197,11 @@ namespace STFormatterCore.Formatter
         /// <summary>
         /// Visits the children of a POU/METHOD body with the same sibling separation
         /// as <see cref="VisitStatementList"/> but indenting only statement children
-        /// (declaration-scope children stay at the header level).
+        /// (declaration-scope children stay at the header level). When
+        /// <paramref name="bareImplementation"/> is true no indent is pushed: the
+        /// outermost statements of an implementation-only text belong at column 0.
         /// </summary>
-        private void VisitBodyChildren(System.Collections.Generic.IList<SyntaxNode> children)
+        private void VisitBodyChildren(System.Collections.Generic.IList<SyntaxNode> children, bool bareImplementation = false)
         {
             bool aroundBlocks = _options.BlankLinesAroundStatementBlocks;
             for (int i = 0; i < children.Count; i++)
@@ -178,7 +215,7 @@ namespace STFormatterCore.Formatter
                 if (aroundBlocks && hasPrev && (block || prevBlock))
                     _output.WriteBlankLine();
 
-                VisitBodyChild(child);
+                VisitBodyChild(child, bareImplementation);
 
                 if (aroundBlocks && hasNext && block)
                     _output.WriteBlankLine();

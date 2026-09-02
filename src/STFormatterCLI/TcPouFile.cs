@@ -114,19 +114,9 @@ namespace STFormatterCLI
             string sourceCode = string.Join("\n", lines);
             if (string.IsNullOrWhiteSpace(sourceCode)) return;
             
-            // For implementation code, wrap in PROGRAM wrapper since it's bare statements
-            string formatted;
-            if (isImplementation)
-            {
-                string wrappedCode = "PROGRAM __Temp__\n" + sourceCode + "\nEND_PROGRAM";
-                formatted = FormatCode(wrappedCode, options);
-                // Strip the PROGRAM __Temp__ and END_PROGRAM lines
-                formatted = StripProgramWrapper(formatted);
-            }
-            else
-            {
-                formatted = FormatCode(sourceCode, options);
-            }
+            // Implementation code is a bare statement list; the core formatter
+            // parses it natively and keeps outermost statements at column 0
+            string formatted = FormatCode(sourceCode, options);
             
             // Split formatted output back into lines
             var formattedLines = formatted.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None);
@@ -234,7 +224,9 @@ namespace STFormatterCLI
         }
         
         /// <summary>
-        /// Format CDATA sections that contain bare ST code by wrapping in a temporary PROGRAM.
+        /// Format CDATA sections that contain bare ST code (implementation bodies).
+        /// The core formatter parses bare statement lists natively, so no temporary
+        /// PROGRAM wrapper is needed and outermost statements stay at column 0.
         /// </summary>
         private void FormatNodesWrapped(string xpath, FormatterOptions options)
         {
@@ -246,12 +238,7 @@ namespace STFormatterCLI
                 string sourceCode = node.InnerText;
                 if (string.IsNullOrWhiteSpace(sourceCode)) continue;
                 
-                // Wrap bare ST code in a temporary PROGRAM wrapper
-                string wrappedCode = "PROGRAM __Temp__\n" + sourceCode + "\nEND_PROGRAM";
-                string formatted = FormatCode(wrappedCode, options);
-                
-                // Strip the PROGRAM __Temp__ and END_PROGRAM lines
-                formatted = StripProgramWrapper(formatted);
+                string formatted = FormatCode(sourceCode, options);
                 
                 // Write back as CDATA
                 node.InnerXml = $"<![CDATA[{formatted}]]>";
@@ -269,44 +256,6 @@ namespace STFormatterCLI
             var cst = parser.Parse();
             var formatter = new STFormatterCore.Formatter.STFormatter(options);
             return formatter.Format(cst, sourceCode);
-        }
-        
-        /// <summary>
-        /// Strips the temporary PROGRAM __Temp__ wrapper from formatted output.
-        /// </summary>
-        private string StripProgramWrapper(string formatted)
-        {
-            var lines = formatted.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None);
-            var resultLines = new List<string>();
-            bool foundProgram = false;
-            
-            for (int i = 0; i < lines.Length; i++)
-            {
-                var trimmed = lines[i].Trim();
-                
-                // Skip the PROGRAM __Temp__ line at the start
-                if (!foundProgram && trimmed.StartsWith("PROGRAM", StringComparison.OrdinalIgnoreCase))
-                {
-                    foundProgram = true;
-                    continue;
-                }
-                
-                // Skip the END_PROGRAM line (can appear anywhere after PROGRAM)
-                if (foundProgram && trimmed.Equals("END_PROGRAM", StringComparison.OrdinalIgnoreCase))
-                    continue;
-                
-                // Skip blank lines immediately after PROGRAM line
-                if (foundProgram && resultLines.Count == 0 && string.IsNullOrWhiteSpace(trimmed))
-                    continue;
-                
-                resultLines.Add(lines[i]);
-            }
-            
-            // Remove trailing empty lines
-            while (resultLines.Count > 0 && string.IsNullOrWhiteSpace(resultLines[resultLines.Count - 1]))
-                resultLines.RemoveAt(resultLines.Count - 1);
-            
-            return string.Join(_lineEnding, resultLines) + _lineEnding;
         }
         
         public void Save()
