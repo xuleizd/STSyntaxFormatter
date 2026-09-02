@@ -20,3 +20,4 @@ testdata/*.ps1
 testdata/*.txt
 testdata/*.before
 testdata/**/*.before
+testdata/backup/

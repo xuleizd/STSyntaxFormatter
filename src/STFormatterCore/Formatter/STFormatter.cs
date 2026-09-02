@@ -438,6 +438,7 @@ namespace STFormatterCore.Formatter
             bool pastAssign = false;
             bool awaitingNameAfterComma = false;
             bool parenthesizedInit = false; // True when init is Type(args) not := expr
+            int parenDepth = 0;
             Token semicolonToken = null;
 
             foreach (var tok in node.Tokens)
@@ -475,11 +476,18 @@ namespace STFormatterCore.Formatter
                     continue;
                 }
 
-                if (!pastColon && tok.Kind == TokenKind.Assign)
+                if (tok.Kind == TokenKind.Assign && parenDepth == 0 && !pastAssign && !parenthesizedInit)
                 {
+                    // A depth-0 ':=' after the colon is the init separator. One
+                    // inside parentheses belongs to a parenthesized initialization
+                    // (FB_Type(sNetID:='', ...)) and must stay a type/init token —
+                    // consuming it here would destroy the declaration.
                     pastAssign = true;
                     continue;
                 }
+
+                if (tok.Kind == TokenKind.LeftParen) parenDepth++;
+                else if (tok.Kind == TokenKind.RightParen && parenDepth > 0) parenDepth--;
 
                 // Detect parenthesized initialization: Type(args) after colon
                 if (pastColon && !pastAssign && !parenthesizedInit &&
@@ -1566,14 +1574,36 @@ namespace STFormatterCore.Formatter
 
         private void VisitAssignmentStatement(AssignmentStatement node)
         {
+            WriteStatementBlankLineIfNeeded(node.Tokens);
             _output.WriteIndent(_indent.CurrentIndent);
             WriteStatementTokens(node.Tokens);
         }
 
         private void VisitExpressionStatement(ExpressionStatement node)
         {
+            WriteStatementBlankLineIfNeeded(node.Tokens);
             _output.WriteIndent(_indent.CurrentIndent);
             WriteStatementTokens(node.Tokens);
+        }
+
+        /// <summary>
+        /// Emits a source blank line that precedes a statement. The lexer attaches
+        /// the blank as 2+ consecutive NewLine trivia on the statement's first
+        /// token, but statement tokens go through WriteExpressionTokens which
+        /// skips newline trivia — so without this the blank line would be lost
+        /// even with KeepEmptyLines=true. LineBuilder deduplicates consecutive
+        /// blank lines, so separators added by other policies cannot stack up.
+        /// </summary>
+        private void WriteStatementBlankLineIfNeeded(List<Token> tokens)
+        {
+            if (!_options.KeepEmptyLines) return;
+            if (tokens.Count == 0 || tokens[0].LeadingTrivia == null) return;
+            int newlines = 0;
+            foreach (var trivia in tokens[0].LeadingTrivia)
+                if (trivia.Kind == TriviaKind.NewLine)
+                    newlines++;
+            if (newlines >= 2)
+                _output.WriteBlankLine();
         }
 
         /// <summary>
@@ -2358,12 +2388,12 @@ namespace STFormatterCore.Formatter
             if (current.Kind == TokenKind.OutputAssign || previous.Kind == TokenKind.OutputAssign)
                 return opts.OperatorSpacing;
 
-            // Operator spacing
-            if (opts.OperatorSpacing)
-            {
-                if (IsOperator(current.Kind) || IsOperator(previous.Kind))
-                    return true;
-            }
+            // Operator spacing: with the option on, always separate operators;
+            // with it off, glue them to their operands. Without the explicit
+            // false branch the default rule below would still insert a space,
+            // making OperatorSpacing=false a no-op.
+            if (IsOperator(current.Kind) || IsOperator(previous.Kind))
+                return opts.OperatorSpacing;
 
             // Default: space between most tokens
             return true;
