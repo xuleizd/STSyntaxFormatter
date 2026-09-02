@@ -79,6 +79,17 @@ namespace STFormatterCLITests
                 Assert.Equal(assignCount, CountOccurrences(after, ":="));
                 Assert.Contains("FUNCTION_BLOCK DBManager", after);
                 Assert.Contains("END_VAR", after);
+
+                // Continuation arguments of a multi-line call stay in the column of
+                // the first one. NeedsSpaceBefore only knows the previous token, so
+                // the comma's space used to leak onto the start of every wrapped line
+                // and push it one column right on each formatting run.
+                Assert.Contains(
+                    "IF cmdQuery.ExecuteDataReturn(\r\n" +
+                    "            hDBID := dbId,\r\n" +
+                    "            pExpression := ADR(sqlCmd),\r\n" +
+                    "            cbExpression := SIZEOF(sqlCmd),\r\n",
+                    after);
             }
             finally
             {

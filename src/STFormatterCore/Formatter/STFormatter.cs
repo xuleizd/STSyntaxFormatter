@@ -1664,49 +1664,8 @@ namespace STFormatterCore.Formatter
                 var tok = tokens[i];
                 var prev = i > 0 ? tokens[i - 1] : null;
 
-                // Write leading trivia
                 if (tok.LeadingTrivia != null)
-                {
-                    bool wroteNewline = false;
-                    foreach (var trivia in tok.LeadingTrivia)
-                    {
-                        if (trivia.Kind == TriviaKind.NewLine)
-                        {
-                            if (preserveMultiLine)
-                                wroteNewline = true;
-                            continue;
-                        }
-                        if (trivia.Kind == TriviaKind.Whitespace)
-                            continue;
-                        if (trivia.Kind == TriviaKind.SingleLineComment ||
-                            trivia.Kind == TriviaKind.MultiLineComment)
-                        {
-                            // Write any pending newline before comment
-                            if (preserveMultiLine && wroteNewline && !_output.IsAtLineStart)
-                            {
-                                _output.WriteLine();
-                                _output.WriteIndent(_indent.CurrentIndent + new string(' ', _options.IndentSize));
-                                wroteNewline = false;
-                            }
-                            if (_output.IsAtLineStart)
-                                _output.WriteIndent(_indent.CurrentIndent);
-                            _output.Write(trivia.Text);
-                            if (trivia.Kind == TriviaKind.SingleLineComment)
-                            {
-                                _output.WriteLine();
-                                // Re-indent so the token after the comment keeps its
-                                // indentation (otherwise it starts at column 0).
-                                _output.WriteIndent(_indent.CurrentIndent);
-                            }
-                        }
-                    }
-                    // If there was a newline and we're not at line start, write continuation
-                    if (preserveMultiLine && wroteNewline && !_output.IsAtLineStart)
-                    {
-                        _output.WriteLine();
-                        _output.WriteIndent(_indent.CurrentIndent + new string(' ', _options.IndentSize));
-                    }
-                }
+                    WriteExpressionLeadingTrivia(tok.LeadingTrivia, preserveMultiLine);
 
                 // Max-line-length wrapping: before writing a token that follows a
                 // comma at expression level, break onto a continuation line when the
@@ -1722,11 +1681,88 @@ namespace STFormatterCore.Formatter
                     _output.WriteIndent(_indent.CurrentIndent + _options.IndentString);
                 }
 
-                // Determine spacing before this token
-                if (NeedsSpaceBefore(tok, prev, _options))
+                // Determine spacing before this token. NeedsSpaceBefore only knows the
+                // previous token, so on a continuation line it would put the comma's
+                // space in front of the first argument — one column further right on
+                // every formatting run.
+                if (_output.HasContentOnLine && NeedsSpaceBefore(tok, prev, _options))
                     _output.Write(" ");
 
                 WriteTokenFormatted(tok);
+            }
+        }
+
+        /// <summary>
+        /// Writes the leading trivia of an expression token. A comment moves to a line
+        /// of its own only where the source broke the line; its column is the
+        /// continuation indent when it interrupts code and the column already on the
+        /// line when it follows another comment, so consecutive commented-out arguments
+        /// line up instead of drifting. Only the blank lines the source actually had are
+        /// emitted — breaking the line for a comment leaves a line that holds nothing
+        /// but indentation, and reading that as "code was here" puts a blank line after
+        /// every comment.
+        /// </summary>
+        private void WriteExpressionLeadingTrivia(List<Trivia> trivia, bool preserveMultiLine)
+        {
+            string continuation = _indent.CurrentIndent + new string(' ', _options.IndentSize);
+            int pendingNewlines = 0;
+
+            void EmitSourceBlankLines()
+            {
+                int blanks = SourceBlankLines(pendingNewlines);
+                pendingNewlines = 0;
+                if (blanks > 0)
+                    _output.WriteBlankLines(blanks);
+            }
+
+            foreach (var item in trivia)
+            {
+                if (item.Kind == TriviaKind.NewLine)
+                {
+                    pendingNewlines++;
+                    continue;
+                }
+                if (item.Kind != TriviaKind.SingleLineComment &&
+                    item.Kind != TriviaKind.MultiLineComment)
+                    continue; // Whitespace: the indent written below replaces it
+
+                string indent;
+                if (pendingNewlines > 0 && _output.HasContentOnLine)
+                {
+                    // The source put this comment on a line of its own. One that
+                    // interrupts code belongs with the continuation lines around it;
+                    // one that follows another comment stays in that comment's column.
+                    indent = _output.HasCodeOnLine ? continuation : _output.LastIndent;
+                    _output.WriteLine();
+                }
+                else
+                {
+                    // Inline comment, or the line holds nothing but indentation: keep
+                    // whatever column the line already established.
+                    indent = _output.IsAtLineStart ? _indent.CurrentIndent : _output.LastIndent;
+                }
+                EmitSourceBlankLines();
+
+                if (_output.IsAtLineStart)
+                    _output.WriteIndent(indent);
+                _output.WriteComment(item.Text);
+
+                if (item.Kind == TriviaKind.SingleLineComment)
+                {
+                    _output.WriteLine();
+                    // The code after the comment continues at the comment's column.
+                    _output.WriteIndent(indent);
+                }
+            }
+
+            // A source line break in front of the token itself continues the
+            // expression on a fresh line — unless the line was just opened for a
+            // comment and only waits for its indent.
+            if (preserveMultiLine && pendingNewlines > 0 && _output.HasCodeOnLine)
+            {
+                _output.WriteLine();
+                EmitSourceBlankLines();
+                _output.WriteIndent(continuation);
             }
         }
 

@@ -11,6 +11,9 @@ namespace STFormatterCore.Formatter
         private readonly string _lineEnding;
         private bool _atLineStart;
         private bool _indentWritten;
+        private bool _codeOnLine;
+        private bool _contentOnLine;
+        private string _lastIndent;
         private int _consecutiveNewlines;
 
         public LineBuilder(string lineEnding)
@@ -19,10 +22,34 @@ namespace STFormatterCore.Formatter
             _lineEnding = lineEnding ?? "\n";
             _atLineStart = true;
             _indentWritten = false;
+            _codeOnLine = false;
+            _contentOnLine = false;
+            _lastIndent = string.Empty;
             _consecutiveNewlines = 0;
         }
 
         public bool IsAtLineStart => _atLineStart;
+
+        /// <summary>
+        /// True when the current line holds a real token, not just indentation or
+        /// comments. <see cref="IsAtLineStart"/> can't answer this: WriteIndent
+        /// clears it even when the indent is empty, so a line waiting for its first
+        /// token looks like a line that already has code on it.
+        /// </summary>
+        public bool HasCodeOnLine => _codeOnLine;
+
+        /// <summary>
+        /// True when anything at all has been written on the current line, comments
+        /// included. Decides whether a separating space is needed: a line holding
+        /// only indentation must not start its first token with one.
+        /// </summary>
+        public bool HasContentOnLine => _contentOnLine;
+
+        /// <summary>
+        /// The indent given to the last <see cref="WriteIndent"/> call, so the next
+        /// line can be placed at the same column.
+        /// </summary>
+        public string LastIndent => _lastIndent;
 
         /// <summary>
         /// True when nothing has been written yet. Used to avoid emitting a leading
@@ -42,6 +69,7 @@ namespace STFormatterCore.Formatter
         public void WriteIndent(string indent)
         {
             bool wasAtLineStart = _atLineStart;
+            _lastIndent = indent ?? string.Empty;
             if (_atLineStart && !string.IsNullOrEmpty(indent))
             {
                 _sb.Append(indent);
@@ -64,6 +92,8 @@ namespace STFormatterCore.Formatter
             _sb.Append(text);
             _atLineStart = false;
             _indentWritten = false;
+            _codeOnLine = true;
+            _contentOnLine = true;
             _consecutiveNewlines = 0;
         }
 
@@ -76,6 +106,23 @@ namespace STFormatterCore.Formatter
             _sb.Append(keyword.ToUpperInvariant());
             _atLineStart = false;
             _indentWritten = false;
+            _codeOnLine = true;
+            _contentOnLine = true;
+            _consecutiveNewlines = 0;
+        }
+
+        /// <summary>
+        /// Writes comment text. Fills the line — a token following a block comment on
+        /// the same line still needs its separating space — but does not count as
+        /// code, so the next line is not mistaken for a continuation of an expression.
+        /// </summary>
+        public void WriteComment(string text)
+        {
+            if (string.IsNullOrEmpty(text)) return;
+            _sb.Append(text);
+            _atLineStart = false;
+            _indentWritten = false;
+            _contentOnLine = true;
             _consecutiveNewlines = 0;
         }
 
@@ -90,6 +137,8 @@ namespace STFormatterCore.Formatter
             _sb.Append(_lineEnding);
             _atLineStart = true;
             _indentWritten = false;
+            _codeOnLine = false;
+            _contentOnLine = false;
             _consecutiveNewlines++;
         }
 
@@ -122,6 +171,8 @@ namespace STFormatterCore.Formatter
 
             _atLineStart = true;
             _indentWritten = false;
+            _codeOnLine = false;
+            _contentOnLine = false;
             _consecutiveNewlines = wanted;
         }
 

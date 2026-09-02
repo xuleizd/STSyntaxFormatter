@@ -324,10 +324,13 @@ namespace STFormatterCoreTests
             // The argument line reaches the wrap threshold (MaxLineLength minus
             // IndentSize, measured before the comma) only for small limits: with
             // MaxLineLength=28 the call breaks after the comma and the next
-            // argument continues on its own indented line.
+            // argument continues one indent level deeper than the statement.
+            // The comma's own space must not leak onto the new line, or every
+            // wrapped argument sits one column right of the arguments the user
+            // already broke by hand.
             var source = "PROGRAM P\nIF x THEN\nFunc(aaaaaaaaaa, bbbbbbbbbb);\nEND_IF\nEND_PROGRAM";
             var result = Format(source, Lf(new FormatterOptions { MaxLineLength = 28, IndentSize = 4 }));
-            Assert.Contains("Func(aaaaaaaaaa,\n             bbbbbbbbbb);", result);
+            Assert.Contains("Func(aaaaaaaaaa,\n            bbbbbbbbbb);", result);
         }
 
         [Fact]
