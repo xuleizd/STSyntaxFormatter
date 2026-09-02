@@ -489,6 +489,20 @@ END_FUNCTION_BLOCK";
         }
 
         [Fact]
+        public void BareImplementation_StatementList_TopLevel()
+        {
+            // A TwinCAT editor hands the formatter a bare statement list (the
+            // ImplementationText without any POU/METHOD header). It must parse into
+            // real statement nodes — chunking it into UnknownNodes makes the
+            // formatter emit everything at indent 0 (the flattened-body bug).
+            var source = "x := 1;\nIF a THEN\ny := 2;\nEND_IF";
+            var unit = Parse(source);
+            Assert.Contains(unit.Children, c => c is AssignmentStatement);
+            Assert.Contains(unit.Children, c => c is IfStatement);
+            Assert.DoesNotContain(unit.Children, c => c is UnknownNode);
+        }
+
+        [Fact]
         public void VarPersistent_Block()
         {
             var source = "VAR_PERSISTENT\n    pCounter : INT;\nEND_VAR";

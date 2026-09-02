@@ -113,27 +113,13 @@ namespace STFormatterCore.Formatter
         private void VisitCompilationUnit(CompilationUnit node)
         {
             // Top-level children of a compilation unit (a full POU/METHOD text, or a
-            // bare implementation whose statements are parsed at the root). Statement
-            // blocks at this outermost level get a separating blank line around them
-            // (max one between neighbours); nested blocks do not (they use
-            // VisitStatementList below).
-            bool aroundBlocks = _options.BlankLinesAroundStatementBlocks;
-            for (int i = 0; i < node.Children.Count; i++)
-            {
-                var child = node.Children[i];
-                bool block = IsStatementBlock(child);
-                bool hasPrev = i > 0;
-                bool hasNext = i < node.Children.Count - 1;
-                bool prevBlock = hasPrev && IsStatementBlock(node.Children[i - 1]);
-
-                if (aroundBlocks && hasPrev && (block || prevBlock))
-                    _output.WriteBlankLine();
-
-                Visit(child);
-
-                if (aroundBlocks && hasNext && block)
-                    _output.WriteBlankLine();
-            }
+            // bare implementation whose statements are parsed at the root). Same
+            // sibling handling as a POU body: statement children are indented one
+            // level and get a separating blank line around them (max one between
+            // neighbours); declaration-scope children stay at column 0. This makes a
+            // bare implementation body format exactly like the CLI path that wraps it
+            // in PROGRAM __Temp__ ... END_PROGRAM and strips the wrapper afterwards.
+            VisitBodyChildren(node.Children);
 
             // Handle EOF trivia (trailing comments at end of file)
             // The parser doesn't store EOF, but any trailing trivia is on the last child

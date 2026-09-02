@@ -131,6 +131,14 @@ namespace STFormatterCore.Parser
                 case TokenKind.EndOfFile:
                     return null;
                 default:
+                    // Bare implementation body: TwinCAT hands the implementation
+                    // text of a POU/METHOD over without any header, so a statement
+                    // start at the top level means the whole text is implementation
+                    // code. Parse it with the same statement path as a POU body —
+                    // chunking it into UnknownNodes instead would emit it verbatim
+                    // at the root indent level and flatten the whole body.
+                    if (IsBareStatementStart(Current.Kind))
+                        return ParseStatement();
                     return ParseUnknown();
             }
         }
@@ -557,6 +565,30 @@ namespace STFormatterCore.Parser
                    kind == TokenKind.Keyword_VarExternal ||
                    kind == TokenKind.Keyword_VarAccess ||
                    kind == TokenKind.Keyword_VarConfig;
+        }
+
+        /// <summary>
+        /// True for tokens that can start an ST statement. Used at the top level to
+        /// recognize a bare implementation body (statements without a POU header),
+        /// which the TwinCAT editor hands over via ImplementationText.
+        /// </summary>
+        private static bool IsBareStatementStart(TokenKind kind)
+        {
+            switch (kind)
+            {
+                case TokenKind.Identifier:
+                case TokenKind.Keyword_If:
+                case TokenKind.Keyword_Case:
+                case TokenKind.Keyword_For:
+                case TokenKind.Keyword_While:
+                case TokenKind.Keyword_Repeat:
+                case TokenKind.Keyword_Exit:
+                case TokenKind.Keyword_Continue:
+                case TokenKind.Keyword_Return:
+                    return true;
+                default:
+                    return false;
+            }
         }
 
         private static VarKind MapVarKind(TokenKind kind)

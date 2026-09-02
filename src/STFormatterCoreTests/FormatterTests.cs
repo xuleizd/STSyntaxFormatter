@@ -1315,5 +1315,71 @@ namespace STFormatterCoreTests
         }
 
         #endregion
+
+        #region 53. Bare implementation body (statements without a POU header)
+
+        [Fact]
+        public void BareImplementation_StatementsIndentedOneLevel()
+        {
+            var source = "x := 1;\nIF a THEN\ny := 2;\nEND_IF\n";
+            var result = Format(source, new FormatterOptions { LineEnding = LineEnding.LF });
+            Assert.Contains("    x := 1;", result);
+            Assert.Contains("    IF a THEN", result);
+            Assert.Contains("        y := 2;", result);
+            Assert.Contains("    END_IF", result);
+        }
+
+        [Fact]
+        public void BareImplementation_NestedCaseIndentation()
+        {
+            var source = "CASE step OF\n0:\nx := 1;\n10:\nIF a THEN\ny := 2;\nEND_IF\nEND_CASE\n";
+            var result = Format(source, new FormatterOptions { LineEnding = LineEnding.LF });
+            Assert.Contains("    CASE step OF", result);
+            Assert.Contains("        0:", result);
+            Assert.Contains("            x := 1;", result);
+            Assert.Contains("        10:", result);
+            Assert.Contains("            IF a THEN", result);
+            Assert.Contains("                y := 2;", result);
+            Assert.Contains("            END_IF", result);
+            Assert.Contains("    END_CASE", result);
+        }
+
+        [Fact]
+        public void BareImplementation_MatchesWrappedProgramOutput()
+        {
+            // The VSIX formats ImplementationText bare; the CLI wraps it in
+            // PROGRAM __Temp__ ... END_PROGRAM and strips the wrapper afterwards.
+            // Both paths must produce the same text.
+            var bare =
+                "fb.Execute(a := 1);\n" +
+                "IF x THEN\ny := 2;\nEND_IF\n" +
+                "CASE s OF\n0:\nz := 3;\nEND_CASE\n";
+            var options = new FormatterOptions { LineEnding = LineEnding.LF };
+
+            var bareResult = Format(bare, options);
+
+            var wrapped = Format("PROGRAM __Temp__\n" + bare + "END_PROGRAM", options);
+            var lines = wrapped.Split('\n').ToList();
+            lines.RemoveAt(0); // PROGRAM __Temp__
+            while (lines.Count > 0 && lines[lines.Count - 1].Trim() == "")
+                lines.RemoveAt(lines.Count - 1);
+            Assert.Equal("END_PROGRAM", lines[lines.Count - 1].Trim());
+            lines.RemoveAt(lines.Count - 1);
+            var expected = string.Join("\n", lines) + "\n";
+
+            Assert.Equal(expected, bareResult);
+        }
+
+        [Fact]
+        public void BareImplementation_Idempotent()
+        {
+            var source = "x := 1;\nCASE s OF\n0:\nIF a THEN\ny := 2;\nEND_IF\nEND_CASE\n";
+            var options = new FormatterOptions { LineEnding = LineEnding.LF };
+            var once = Format(source, options);
+            var twice = Format(once, options);
+            Assert.Equal(once, twice);
+        }
+
+        #endregion
     }
 }
