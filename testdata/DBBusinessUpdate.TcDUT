@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.16">
+  <DUT Name="DBBusinessUpdate" Id="{bdba2554-e91f-460d-86ff-6c79aaa67ffd}">
+    <Declaration><![CDATA[{attribute 'pack_mode' := '1'}
+TYPE DBBusinessUpdate :
+STRUCT
+    // ID       : LINT;    // 自增
+    PLANNO   : WSTRING(30);
+    USERNAME : WSTRING(20);
+    KSSJ     : DATE_AND_TIME;
+    WC       : DINT;
+    // ISFG     : BOOL;
+    // DATA01   : LREAL;
+END_STRUCT
+END_TYPE
+]]></Declaration>
+  </DUT>
+</TcPlcObject>

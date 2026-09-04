@@ -15,6 +15,7 @@ namespace STFormatterCore.Formatter
         private bool _contentOnLine;
         private string _lastIndent;
         private int _consecutiveNewlines;
+        private int _lineStartPos;
 
         public LineBuilder(string lineEnding)
         {
@@ -26,6 +27,7 @@ namespace STFormatterCore.Formatter
             _contentOnLine = false;
             _lastIndent = string.Empty;
             _consecutiveNewlines = 0;
+            _lineStartPos = 0;
         }
 
         public bool IsAtLineStart => _atLineStart;
@@ -68,19 +70,31 @@ namespace STFormatterCore.Formatter
         /// </summary>
         public void WriteIndent(string indent)
         {
-            bool wasAtLineStart = _atLineStart;
-            _lastIndent = indent ?? string.Empty;
-            if (_atLineStart && !string.IsNullOrEmpty(indent))
+            string value = indent ?? string.Empty;
+            _lastIndent = value;
+
+            // Nothing but indentation on this line so far, so the indent written here
+            // is the one that counts — rewind past whatever an earlier WriteIndent put
+            // there. Without this a visit method that indents its keyword *after* the
+            // leading-trivia writer already re-indented the line loses the call, and
+            // the keyword is dragged to the comment's column.
+            if (!_contentOnLine)
             {
-                _sb.Append(indent);
+                _sb.Length = _lineStartPos;
+                _sb.Append(value);
+                _atLineStart = false;
+                _indentWritten = true;
+                // Don't reset _consecutiveNewlines: the line still holds no content,
+                // so blank line deduplication has to survive across indent boundaries
+                // (e.g., blank lines before ELSE, END_IF, etc.).
+                return;
             }
+
+            if (_atLineStart)
+                _sb.Append(value);
             _atLineStart = false;
             _indentWritten = true;
-            // Don't reset _consecutiveNewlines when at line start.
-            // This preserves blank line deduplication across indent boundaries
-            // (e.g., blank lines before ELSE, END_IF, etc.).
-            if (!wasAtLineStart)
-                _consecutiveNewlines = 0;
+            _consecutiveNewlines = 0;
         }
 
         /// <summary>
@@ -135,6 +149,7 @@ namespace STFormatterCore.Formatter
             // Allow at most 2 consecutive newlines (one blank line)
             if (_consecutiveNewlines >= 2) return;
             _sb.Append(_lineEnding);
+            _lineStartPos = _sb.Length;
             _atLineStart = true;
             _indentWritten = false;
             _codeOnLine = false;
@@ -169,6 +184,7 @@ namespace STFormatterCore.Formatter
             for (int i = 0; i < missing; i++)
                 _sb.Append(_lineEnding);
 
+            _lineStartPos = _sb.Length;
             _atLineStart = true;
             _indentWritten = false;
             _codeOnLine = false;

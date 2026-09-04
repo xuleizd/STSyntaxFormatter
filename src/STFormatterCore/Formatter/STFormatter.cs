@@ -1084,14 +1084,12 @@ namespace STFormatterCore.Formatter
                     if (child is ElsifClause elsif)
                     {
                         // Write ELSIF at IF level (not body level)
-                        _output.WriteIndent(ifIndent);
-                        WriteElsifAtParentLevel(elsif);
+                        WriteElsifAtParentLevel(elsif, ifIndent);
                     }
                     else if (child is ElseClause elseClause)
                     {
                         // Write ELSE at IF level (not body level)
-                        _output.WriteIndent(ifIndent);
-                        WriteElseAtParentLevel(elseClause);
+                        WriteElseAtParentLevel(elseClause, ifIndent);
                     }
                     else
                     {
@@ -1104,8 +1102,8 @@ namespace STFormatterCore.Formatter
             var endIfToken = node.Tokens.LastOrDefault(t => t.Kind == TokenKind.Keyword_EndIf);
             if (endIfToken != null)
             {
-                _output.WriteIndent(ifIndent);
                 WriteLeadingTrivia(endIfToken);
+                _output.WriteIndent(ifIndent);
                 _output.WriteKeyword("END_IF");
                 WriteTrailingTrivia(endIfToken);
             }
@@ -1133,8 +1131,10 @@ namespace STFormatterCore.Formatter
         /// Writes an ELSIF clause at the parent (IF) indent level.
         /// The body is visited at the current indent level (already IF+1).
         /// </summary>
-        private void WriteElsifAtParentLevel(ElsifClause node)
+        private void WriteElsifAtParentLevel(ElsifClause node, string parentIndent)
         {
+            _output.WriteIndent(parentIndent);
+
             var condTokens = new List<Token>();
             Token thenToken = null;
 
@@ -1142,7 +1142,13 @@ namespace STFormatterCore.Formatter
             {
                 if (tok.Kind == TokenKind.Keyword_Elsif)
                 {
+                    // Trivia first, indent after: a comment above ELSIF documents the
+                    // body being left and belongs at the body indent, while the keyword
+                    // returns to the IF column. The later WriteIndent is the one that
+                    // places the keyword, since it replaces the indent of a line that
+                    // still holds nothing else.
                     WriteLeadingTrivia(tok);
+                    _output.WriteIndent(parentIndent);
                     _output.WriteKeyword("ELSIF");
                     continue;
                 }
@@ -1173,11 +1179,15 @@ namespace STFormatterCore.Formatter
         /// Writes an ELSE clause at the parent (IF) indent level.
         /// The body is visited at the current indent level (already IF+1).
         /// </summary>
-        private void WriteElseAtParentLevel(ElseClause node)
+        private void WriteElseAtParentLevel(ElseClause node, string parentIndent)
         {
+            _output.WriteIndent(parentIndent);
+
             if (node.Tokens.Count > 0)
             {
+                // Trivia first, indent after — see WriteElsifAtParentLevel.
                 WriteLeadingTrivia(node.Tokens[0]);
+                _output.WriteIndent(parentIndent);
             }
             _output.WriteKeyword("ELSE");
             _output.WriteLine();
@@ -2439,18 +2449,24 @@ namespace STFormatterCore.Formatter
         }
 
         /// <summary>
-        /// Writes leading trivia (comments, newlines) before a token.
+        /// Writes leading trivia (comments, newlines) before a token. A comment sits at
+        /// the indent of the code it documents — which for a keyword that closes an
+        /// indented body is that body, one level deeper than the keyword itself.
         /// </summary>
         private void WriteLeadingTrivia(Token token)
         {
             if (token.LeadingTrivia == null || token.LeadingTrivia.Count == 0)
                 return;
 
+            string commentIndent = _indent.CurrentIndent;
+            if (ClosesIndentedBody(token.Kind))
+                commentIndent += _options.IndentString;
+
             int pendingNewlines = 0;
 
             // Emits the blank lines of the gap that just ended — either at a comment
             // or, when the trivia runs out, in front of the token itself.
-            void FlushBlankLines()
+            void FlushBlankLines(string indent)
             {
                 int blanks = SourceBlankLines(pendingNewlines);
                 pendingNewlines = 0;
@@ -2459,7 +2475,7 @@ namespace STFormatterCore.Formatter
                 _output.WriteBlankLines(blanks);
                 // The blank lines put us on a fresh line, so re-apply the indent —
                 // otherwise whatever follows would start at column 0.
-                _output.WriteIndent(_indent.CurrentIndent);
+                _output.WriteIndent(indent);
             }
 
             foreach (var trivia in token.LeadingTrivia)
@@ -2475,13 +2491,16 @@ namespace STFormatterCore.Formatter
                     case TriviaKind.SingleLineComment:
                     case TriviaKind.MultiLineComment:
                         // A comment that travelled as leading trivia sits on its own
-                        // line directly above the token. Emit it at the current
-                        // indent, end the line, and re-indent so the token itself
-                        // keeps its indentation (otherwise the token would start the
-                        // next line at column 0).
-                        FlushBlankLines();
-                        if (_output.IsAtLineStart)
-                            _output.WriteIndent(_indent.CurrentIndent);
+                        // line directly above the token. Emit it at the comment's
+                        // indent, end the line, and re-indent so the token itself keeps
+                        // its indentation (otherwise the token would start the next
+                        // line at column 0).
+                        FlushBlankLines(commentIndent);
+                        // HasContentOnLine, not IsAtLineStart: the visit method may
+                        // already have written the keyword's indent, and WriteIndent
+                        // replaces it while the line holds nothing else.
+                        if (!_output.HasContentOnLine)
+                            _output.WriteIndent(commentIndent);
                         else
                             WriteCommentGap(trivia.Kind == TriviaKind.SingleLineComment);
                         _output.WriteComment(NormalizeCommentText(trivia.Text));
@@ -2493,7 +2512,7 @@ namespace STFormatterCore.Formatter
                 }
             }
 
-            FlushBlankLines();
+            FlushBlankLines(_indent.CurrentIndent);
         }
 
         /// <summary>
@@ -2664,6 +2683,43 @@ namespace STFormatterCore.Formatter
                    kind == TokenKind.Keyword_EndNamespace ||
                    kind == TokenKind.Keyword_EndAction ||
                    kind == TokenKind.Keyword_EndTransition;
+        }
+
+        /// <summary>
+        /// True when a keyword's own line sits at the enclosing block's indent while the
+        /// code directly above it sits one level deeper, so a comment carried as its
+        /// leading trivia belongs to that body rather than to the keyword's column.
+        /// END_TYPE is not one of them (a TYPE body — STRUCT, the enum parenthesis, an
+        /// alias — is written at the TYPE header's own column) and neither is
+        /// END_REPEAT (the line above it is the UNTIL condition). ELSE/ELSIF are left
+        /// out too: their visitors still hold the body indent pushed, so CurrentIndent
+        /// already is the body level.
+        /// </summary>
+        private static bool ClosesIndentedBody(TokenKind kind)
+        {
+            switch (kind)
+            {
+                case TokenKind.Keyword_EndVar:
+                case TokenKind.Keyword_EndStruct:
+                case TokenKind.Keyword_EndUnion:
+                case TokenKind.Keyword_EndIf:
+                case TokenKind.Keyword_EndCase:
+                case TokenKind.Keyword_EndFor:
+                case TokenKind.Keyword_EndWhile:
+                case TokenKind.Keyword_EndProgram:
+                case TokenKind.Keyword_EndFunction:
+                case TokenKind.Keyword_EndFunctionBlock:
+                case TokenKind.Keyword_EndMethod:
+                case TokenKind.Keyword_EndProperty:
+                case TokenKind.Keyword_EndAction:
+                case TokenKind.Keyword_EndInterface:
+                case TokenKind.Keyword_EndTransition:
+                case TokenKind.Keyword_EndNamespace:
+                case TokenKind.Keyword_Until:
+                    return true;
+                default:
+                    return false;
+            }
         }
 
         /// <summary>

@@ -11,7 +11,10 @@ namespace STFormatterCoreTests
     /// A comment is formatted, not copied. Three rules:
     ///   1. exactly one space follows '//';
     ///   2. a comment behind code on the same line sits 4 spaces away from it;
-    ///   3. a comment on a line of its own takes the indent of the line BELOW it.
+    ///   3. a comment on a line of its own takes the indent of the code it
+    ///      documents — the line below it, unless that line closes a block, in
+    ///      which case the comment belongs to the body being closed and stays one
+    ///      level deeper than the closing keyword.
     /// Plus the invariant the rules must not break: formatting never deletes a
     /// comment. Three paths used to do exactly that — a comment on the last line
     /// of the source was filed as leading trivia of EOF, comment lines after the
@@ -189,10 +192,10 @@ namespace STFormatterCoreTests
                 "b := 1; (* tail *)\n");
         }
 
-        // ---- rule 3: a standalone comment takes the indent of the line below ----
+        // ---- rule 3: a standalone comment takes the indent of the code it documents ----
 
         [Fact]
-        public void StandaloneComment_TakesTheIndentOfTheLineBelow()
+        public void StandaloneComment_AboveAStatement_TakesThatStatementsIndent()
         {
             AssertLayout(
                 "IF x THEN\n" +
@@ -206,11 +209,11 @@ namespace STFormatterCoreTests
         }
 
         [Fact]
-        public void StandaloneComment_BeforeEndIf_FollowsEndIfsColumn()
+        public void StandaloneComment_BeforeEndIf_KeepsTheBodysIndent()
         {
-            // The line below the comment is END_IF, back at column 0, so the
-            // comment goes there too — the rule follows the next line wherever it
-            // lands, it does not remember the block the comment was written in.
+            // The line below the comment is END_IF, back at column 0, but the
+            // comment documents the body being closed — pulling it out to the
+            // keyword's column detaches it from the code it belongs to.
             AssertLayout(
                 "IF x THEN\n" +
                 "    y := 1;\n" +
@@ -218,8 +221,153 @@ namespace STFormatterCoreTests
                 "END_IF\n",
                 "IF x THEN\n" +
                 "    y := 1;\n" +
-                "// tail\n" +
+                "    // tail\n" +
                 "END_IF\n");
+        }
+
+        [Fact]
+        public void StandaloneComment_BeforeEndIfOfANestedIf_KeepsTheInnerBodysIndent()
+        {
+            AssertLayout(
+                "IF x THEN\n" +
+                "    IF y THEN\n" +
+                "        z := 1;\n" +
+                "    // inner tail\n" +
+                "    END_IF\n" +
+                "// outer tail\n" +
+                "END_IF\n",
+                "IF x THEN\n" +
+                "    IF y THEN\n" +
+                "        z := 1;\n" +
+                "        // inner tail\n" +
+                "    END_IF\n" +
+                "    // outer tail\n" +
+                "END_IF\n");
+        }
+
+        [Fact]
+        public void StandaloneComment_BeforeElse_KeepsTheBodysIndentAndDoesNotMoveElse()
+        {
+            // The IF visitor writes ELSE at the IF column, so the comment used to
+            // land at column 0 and drag ELSE one level to the right with it.
+            AssertLayout(
+                "IF x THEN\n" +
+                "    y := 1;\n" +
+                "// before ELSE\n" +
+                "ELSE\n" +
+                "    y := 2;\n" +
+                "END_IF\n",
+                "IF x THEN\n" +
+                "    y := 1;\n" +
+                "    // before ELSE\n" +
+                "ELSE\n" +
+                "    y := 2;\n" +
+                "END_IF\n");
+        }
+
+        [Fact]
+        public void StandaloneComment_BeforeElsif_KeepsTheBodysIndentAndDoesNotMoveElsif()
+        {
+            AssertLayout(
+                "IF x THEN\n" +
+                "    y := 1;\n" +
+                "// before ELSIF\n" +
+                "ELSIF z THEN\n" +
+                "    y := 2;\n" +
+                "END_IF\n",
+                "IF x THEN\n" +
+                "    y := 1;\n" +
+                "    // before ELSIF\n" +
+                "ELSIF z THEN\n" +
+                "    y := 2;\n" +
+                "END_IF\n");
+        }
+
+        [Fact]
+        public void StandaloneComment_BeforeEndVar_TakesTheMembersIndent()
+        {
+            AssertLayout(
+                "PROGRAM P\n" +
+                "VAR\n" +
+                "    x : INT;\n" +
+                "// tail\n" +
+                "END_VAR\n" +
+                "END_PROGRAM\n",
+                "PROGRAM P\n" +
+                "VAR\n" +
+                "    x : INT;\n" +
+                "    // tail\n" +
+                "END_VAR\n" +
+                "END_PROGRAM\n");
+        }
+
+        [Fact]
+        public void StandaloneComment_BeforeEndStruct_TakesTheMembersIndent()
+        {
+            // As reported in DBBusinessUpdate.TcDUT: the commented-out members above
+            // the first declaration kept their column while the ones above END_STRUCT
+            // fell back to column 0, splitting one block of comments in two.
+            AssertLayout(
+                "TYPE T :\n" +
+                "STRUCT\n" +
+                "    // ID : LINT;\n" +
+                "    KSSJ : DATE_AND_TIME;\n" +
+                "// WC : INT;\n" +
+                "// ISFG : BOOL;\n" +
+                "END_STRUCT\n" +
+                "END_TYPE\n",
+                "TYPE T :\n" +
+                "STRUCT\n" +
+                "    // ID : LINT;\n" +
+                "    KSSJ : DATE_AND_TIME;\n" +
+                "    // WC : INT;\n" +
+                "    // ISFG : BOOL;\n" +
+                "END_STRUCT\n" +
+                "END_TYPE\n");
+        }
+
+        [Fact]
+        public void StandaloneComment_BeforeEndCase_TakesTheBranchIndent()
+        {
+            AssertLayout(
+                "CASE x OF\n" +
+                "1:\n" +
+                "    y := 1;\n" +
+                "// tail\n" +
+                "END_CASE\n",
+                "CASE x OF\n" +
+                "    1:\n" +
+                "        y := 1;\n" +
+                "    // tail\n" +
+                "END_CASE\n");
+        }
+
+        [Fact]
+        public void StandaloneComment_BeforeEndFor_TakesTheBodysIndent()
+        {
+            AssertLayout(
+                "FOR i := 0 TO 10 DO\n" +
+                "    y := i;\n" +
+                "// tail\n" +
+                "END_FOR\n",
+                "FOR i := 0 TO 10 DO\n" +
+                "    y := i;\n" +
+                "    // tail\n" +
+                "END_FOR\n");
+        }
+
+        [Fact]
+        public void StandaloneComment_BeforeEndWhile_TakesTheBodysIndent()
+        {
+            AssertLayout(
+                "WHILE x < 10 DO\n" +
+                "    x := x + 1;\n" +
+                "// tail\n" +
+                "END_WHILE\n",
+                "WHILE x < 10 DO\n" +
+                "    x := x + 1;\n" +
+                "    // tail\n" +
+                "END_WHILE\n");
         }
 
         [Fact]
@@ -301,8 +449,10 @@ namespace STFormatterCoreTests
         [Fact]
         public void CommentedOutBody_OfAFullPou_IsNotDeleted()
         {
-            // The comment lines sit directly above END_PROGRAM, so rule 3 puts them
-            // at END_PROGRAM's column — the same as a comment above END_IF.
+            // The comment lines sit directly above END_PROGRAM. They are the POU's
+            // commented-out body, so rule 3 puts them at the body indent — not at
+            // END_PROGRAM's column, which is where the old "follow the line below"
+            // reading of the rule dropped them.
             AssertLayout(
                 "PROGRAM P\n" +
                 "VAR\n" +
@@ -315,8 +465,8 @@ namespace STFormatterCoreTests
                 "VAR\n" +
                 "    x : INT;\n" +
                 "END_VAR\n" +
-                "// x := 1;\n" +
-                "// x := 2;\n" +
+                "    // x := 1;\n" +
+                "    // x := 2;\n" +
                 "END_PROGRAM\n");
         }
 
