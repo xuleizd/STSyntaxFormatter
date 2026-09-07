@@ -1528,6 +1528,7 @@ namespace STFormatterCore.Formatter
             Token untilToken = null;
             var condTokens = new List<Token>();
             Token endRepeatToken = null;
+            bool sourceHasSemicolon = false;
 
             foreach (var tok in node.Tokens)
             {
@@ -1545,6 +1546,11 @@ namespace STFormatterCore.Formatter
                 if (tok.Kind == TokenKind.Keyword_EndRepeat)
                 {
                     endRepeatToken = tok;
+                    continue;
+                }
+                if (tok.Kind == TokenKind.Semicolon)
+                {
+                    sourceHasSemicolon = true;
                     continue;
                 }
                 // After UNTIL, tokens are condition; before UNTIL they shouldn't exist
@@ -1577,7 +1583,9 @@ namespace STFormatterCore.Formatter
                 _output.Write(" ");
             }
             WriteExpressionTokens(condTokens);
-            _output.Write(";");
+            // ST puts no ';' after the UNTIL condition, so only keep one the source had.
+            if (sourceHasSemicolon)
+                _output.Write(";");
             _output.WriteLine();
 
             // Write END_REPEAT

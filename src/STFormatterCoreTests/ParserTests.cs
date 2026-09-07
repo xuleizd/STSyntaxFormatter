@@ -270,6 +270,29 @@ END_FUNCTION_BLOCK";
             var repeatStmt = prog.Children.OfType<RepeatStatement>().FirstOrDefault();
             Assert.NotNull(repeatStmt);
             Assert.NotEmpty(repeatStmt.Children);
+            // END_REPEAT closes the loop, it is not part of the UNTIL condition.
+            Assert.Contains(repeatStmt.Tokens, t => t.Kind == TokenKind.Keyword_EndRepeat);
+        }
+
+        [Fact]
+        public void RepeatUntil_WithoutSemicolon_DoesNotAbsorbTheNextStatement()
+        {
+            // ST puts no ';' after the UNTIL expression, so collecting the
+            // condition up to a semicolon used to run straight past END_REPEAT.
+            var unit = Parse("PROGRAM P\nREPEAT\n    x := x - 1;\nUNTIL x <= 0\nEND_REPEAT\ny := 2;\nEND_PROGRAM");
+            var prog = Assert.IsType<DeclarationBlock>(unit.Children[0]);
+            var repeatStmt = prog.Children.OfType<RepeatStatement>().FirstOrDefault();
+            Assert.NotNull(repeatStmt);
+            Assert.Contains(repeatStmt.Tokens, t => t.Kind == TokenKind.Keyword_EndRepeat);
+
+            var condition = repeatStmt.Tokens.SkipWhile(t => t.Kind != TokenKind.Keyword_Until).Skip(1)
+                .TakeWhile(t => t.Kind != TokenKind.Keyword_EndRepeat)
+                .ToList();
+            Assert.DoesNotContain(condition, t => t.Text == "y");
+
+            // 'y := 2;' is a sibling of the loop, not part of its condition.
+            Assert.Contains(prog.Children, c => c != repeatStmt &&
+                c.Tokens.Any(t => t.Text == "y"));
         }
 
         #endregion

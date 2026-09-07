@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.16">
+  <POU Name="RepeatUntil" Id="{00000000-0000-0000-0000-000000000002}" SpecialFunc="None">
+    <Declaration><![CDATA[PROGRAM RepeatUntil
+VAR
+    a : INT;
+END_VAR
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[REPEAT
+    a := a - 1;
+UNTIL a <= 0
+END_REPEAT
+
+IF a > 0 THEN
+    IF a > 5 THEN
+        a := 1;
+    END_IF
+END_IF
+
+REPEAT
+    a := a + 1;
+    // before UNTIL
+UNTIL a > 10;
+END_REPEAT
+]]></ST>
+    </Implementation>
+  </POU>
+</TcPlcObject>

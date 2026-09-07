@@ -1083,11 +1083,17 @@ namespace STFormatterCore.Parser
             if (Current.Kind == TokenKind.Keyword_Until)
                 node.AddToken(Advance()); // UNTIL
 
-            // Condition until semicolon
-            CollectExpressionTokens(node, TokenKind.Semicolon);
+            // The condition runs to END_REPEAT: ST puts no ';' after the UNTIL
+            // expression, so collecting to a semicolon swallowed END_REPEAT together
+            // with every statement following the loop. A ';' the source really has is
+            // still accepted as a terminator.
+            CollectExpressionTokens(node, TokenKind.Keyword_EndRepeat, TokenKind.Semicolon);
 
             if (Current.Kind == TokenKind.Semicolon)
                 node.AddToken(Advance());
+
+            if (Current.Kind == TokenKind.Keyword_EndRepeat)
+                node.AddToken(Advance()); // END_REPEAT
 
             return node;
         }

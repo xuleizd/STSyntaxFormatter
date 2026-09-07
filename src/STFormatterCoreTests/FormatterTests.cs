@@ -300,25 +300,142 @@ namespace STFormatterCoreTests
 
         #region 14. REPEAT/UNTIL formatting
 
+        // ST puts no ';' after the UNTIL condition, so the loop used to run past
+        // END_REPEAT and swallow every statement that followed it. These pin the
+        // exact layout of the whole loop plus whatever comes after it.
+
+        private static string Lines(params string[] lines) => string.Join("\n", lines);
+
         [Fact]
         public void RepeatUntil_KeywordsUppercased_BodyIndented()
         {
-            var source = "PROGRAM P\nREPEAT\nx := x + 1;\nUNTIL x > 10;\nEND_REPEAT\nEND_PROGRAM";
+            var result = Format("PROGRAM P\nREPEAT\nx := x + 1;\nUNTIL x > 10;\nEND_REPEAT\nEND_PROGRAM");
+            Assert.Equal(Lines(
+                "PROGRAM P",
+                "    REPEAT",
+                "        x := x + 1;",
+                "    UNTIL x > 10;",
+                "    END_REPEAT",
+                "END_PROGRAM",
+                ""), result);
+        }
+
+        [Fact]
+        public void RepeatUntil_WithoutSemicolon_DoesNotInventOne()
+        {
+            var result = Format("PROGRAM P\nREPEAT\nx := x + 1;\nUNTIL x > 10\nEND_REPEAT\nEND_PROGRAM");
+            Assert.Equal(Lines(
+                "PROGRAM P",
+                "    REPEAT",
+                "        x := x + 1;",
+                "    UNTIL x > 10",
+                "    END_REPEAT",
+                "END_PROGRAM",
+                ""), result);
+            Assert.DoesNotContain(";;", result);
+        }
+
+        [Fact]
+        public void RepeatUntil_StatementsAfterEndRepeat_StayOutsideTheLoop()
+        {
+            var source = Lines(
+                "PROGRAM P",
+                "REPEAT",
+                "    x := x - 1;",
+                "UNTIL x <= 0",
+                "END_REPEAT",
+                "IF x > 0 THEN",
+                "    y := 1;",
+                "END_IF",
+                "z := 2;",
+                "END_PROGRAM");
             var result = Format(source);
-            Assert.Contains("REPEAT", result);
-            Assert.Contains("UNTIL", result);
-            Assert.Contains("END_REPEAT", result);
-            var lines = result.Split(new[] { "\r\n", "\n" }, System.StringSplitOptions.None);
-            bool hasIndentedBody = false;
-            foreach (var line in lines)
-            {
-                if (line.Contains("x :=") && line.Length > 0 && (line[0] == ' ' || line[0] == '\t'))
-                {
-                    hasIndentedBody = true;
-                    break;
-                }
-            }
-            Assert.True(hasIndentedBody, "REPEAT body should be indented");
+            // The blank lines around END_REPEAT / END_IF are the formatter's own
+            // BlankLinesAroundStatementBlocks separation, not leftovers from the
+            // loop having swallowed them.
+            Assert.Equal(Lines(
+                "PROGRAM P",
+                "    REPEAT",
+                "        x := x - 1;",
+                "    UNTIL x <= 0",
+                "    END_REPEAT",
+                "",
+                "    IF x > 0 THEN",
+                "        y := 1;",
+                "    END_IF",
+                "",
+                "    z := 2;",
+                "END_PROGRAM",
+                ""), result);
+            Assert.DoesNotContain(";;", result);
+            Assert.Equal(1, result.Split(new[] { "END_REPEAT" }, StringSplitOptions.None).Length - 1);
+        }
+
+        [Fact]
+        public void RepeatUntil_CommentAboveUntil_SitsAtTheBodyIndent()
+        {
+            var source = Lines(
+                "PROGRAM P",
+                "REPEAT",
+                "    x := x + 1;",
+                "    // still looping",
+                "UNTIL x > 10",
+                "END_REPEAT",
+                "END_PROGRAM");
+            var result = Format(source);
+            Assert.Equal(Lines(
+                "PROGRAM P",
+                "    REPEAT",
+                "        x := x + 1;",
+                "        // still looping",
+                "    UNTIL x > 10",
+                "    END_REPEAT",
+                "END_PROGRAM",
+                ""), result);
+        }
+
+        [Fact]
+        public void NestedRepeatUntil_KeepsItsLevels()
+        {
+            var source = Lines(
+                "PROGRAM P",
+                "REPEAT",
+                "REPEAT",
+                "y := y + 1;",
+                "UNTIL y > 5",
+                "END_REPEAT",
+                "x := x + 1;",
+                "UNTIL x > 10",
+                "END_REPEAT",
+                "END_PROGRAM");
+            var result = Format(source);
+            Assert.Equal(Lines(
+                "PROGRAM P",
+                "    REPEAT",
+                "        REPEAT",
+                "            y := y + 1;",
+                "        UNTIL y > 5",
+                "        END_REPEAT",
+                "        x := x + 1;",
+                "    UNTIL x > 10",
+                "    END_REPEAT",
+                "END_PROGRAM",
+                ""), result);
+        }
+
+        [Fact]
+        public void RepeatUntil_IsAFixedPoint()
+        {
+            var source = Lines(
+                "PROGRAM P",
+                "REPEAT",
+                "x := x - 1;",
+                "UNTIL x <= 0;",
+                "END_REPEAT",
+                "y := 1;",
+                "END_PROGRAM");
+            var first = Format(source);
+            Assert.Equal(first, Format(first));
         }
 
         #endregion
