@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.16">
+  <DUT Name="ST_RetainCounter" Id="{8e4a9c31-5f26-4b7d-a3c8-90d1e2f3ab04}">
+    <Declaration><![CDATA[TYPE ST_RetainCounter :
+    STRUCT RETAIN
+    nCounter   : DINT;
+    sLabel     : STRING(32);
+    bEnabled   : BOOL;
+    END_STRUCT
+END_TYPE
+]]></Declaration>
+  </DUT>
+</TcPlcObject>

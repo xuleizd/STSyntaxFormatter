@@ -1938,11 +1938,25 @@ namespace STFormatterCore.Formatter
         {
             _output.WriteIndent(_indent.CurrentIndent);
 
-            // Write STRUCT keyword
+            // Write STRUCT keyword plus the retain modifiers the parser captured
+            // right after it ("STRUCT RETAIN" / "STRUCT PERSISTENT"): they belong
+            // to the header line and must never be dropped.
             if (node.Tokens.Count > 0)
             {
                 WriteLeadingTrivia(node.Tokens[0]);
                 _output.WriteKeyword("STRUCT");
+                WriteTrailingTrivia(node.Tokens[0]);
+
+                foreach (var tok in node.Tokens.Skip(1))
+                {
+                    if (tok.Kind != TokenKind.Keyword_Retain &&
+                        tok.Kind != TokenKind.Keyword_Persistent)
+                        break;
+                    WriteLeadingTrivia(tok);
+                    _output.Write(" ");
+                    _output.WriteKeyword(tok.Text);
+                    WriteTrailingTrivia(tok);
+                }
             }
             _output.WriteLine();
 
@@ -2107,11 +2121,24 @@ namespace STFormatterCore.Formatter
         {
             _output.WriteIndent(_indent.CurrentIndent);
 
-            // Write UNION keyword
+            // Write UNION keyword plus header modifiers ("UNION RETAIN"), the same
+            // policy as STRUCT.
             if (node.Tokens.Count > 0)
             {
                 WriteLeadingTrivia(node.Tokens[0]);
                 _output.WriteKeyword("UNION");
+                WriteTrailingTrivia(node.Tokens[0]);
+
+                foreach (var tok in node.Tokens.Skip(1))
+                {
+                    if (tok.Kind != TokenKind.Keyword_Retain &&
+                        tok.Kind != TokenKind.Keyword_Persistent)
+                        break;
+                    WriteLeadingTrivia(tok);
+                    _output.Write(" ");
+                    _output.WriteKeyword(tok.Text);
+                    WriteTrailingTrivia(tok);
+                }
             }
             _output.WriteLine();
 

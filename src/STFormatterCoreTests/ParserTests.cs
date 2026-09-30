@@ -315,6 +315,28 @@ END_FUNCTION_BLOCK";
             Assert.Equal("b", decls[1].Name);
         }
 
+        [Fact]
+        public void TypeStructRetain_ModifierIsAHeaderTokenOfTheStructBody()
+        {
+            // "STRUCT RETAIN" (whole-struct retain data, see the Beckhoff 'TcRetain'
+            // docs). The modifier must be captured by the StructBody right after the
+            // STRUCT keyword — the stray-token fallback used to swallow it silently
+            // and the formatter dropped it, deleting the retain property from the code.
+            var source = "TYPE S : STRUCT RETAIN\n    a : INT;\nEND_STRUCT\nEND_TYPE";
+            var unit = Parse(source);
+            var typeDecl = Assert.IsType<TypeDeclaration>(unit.Children[0]);
+            var structBody = typeDecl.Children.OfType<StructBody>().FirstOrDefault();
+            Assert.NotNull(structBody);
+
+            Assert.True(structBody.Tokens.Count >= 3, "STRUCT, RETAIN and END_STRUCT must all be body tokens");
+            Assert.Equal(TokenKind.Keyword_Struct, structBody.Tokens[0].Kind);
+            Assert.Equal(TokenKind.Keyword_Retain, structBody.Tokens[1].Kind);
+            Assert.Equal(TokenKind.Keyword_EndStruct, structBody.Tokens[structBody.Tokens.Count - 1].Kind);
+
+            // RETAIN is a header modifier, not a member declaration.
+            Assert.Single(structBody.Children.OfType<VarDeclaration>());
+        }
+
         #endregion
 
         #region 17. TYPE/ENUM

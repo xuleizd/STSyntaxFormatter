@@ -120,6 +120,94 @@ namespace STFormatterCoreTests
         }
 
         [Fact]
+        public void StructRetain_ModifierStaysOnTheStructHeaderLine()
+        {
+            // TwinCAT 3 can declare a whole struct as retain data — "STRUCT RETAIN"
+            // (the Retain Handler then manages every instance of the type, see the
+            // Beckhoff 'TcRetain' docs). The modifier is part of the header, not a
+            // member: it stays on the STRUCT line and must survive formatting.
+            AssertLayout(
+                "TYPE ST_Counter :\n" +
+                "    STRUCT RETAIN\n" +
+                "    nValue : INT;\n" +
+                "    END_STRUCT\n" +
+                "END_TYPE\n",
+                "TYPE ST_Counter :\n" +
+                "STRUCT RETAIN\n" +
+                "    nValue : INT;\n" +
+                "END_STRUCT\n" +
+                "END_TYPE\n");
+        }
+
+        [Fact]
+        public void StructRetain_OnItsOwnLine_JoinsTheHeader()
+        {
+            AssertLayout(
+                "TYPE ST_C :\n" +
+                "STRUCT\n" +
+                "RETAIN\n" +
+                "x : BOOL;\n" +
+                "END_STRUCT\n" +
+                "END_TYPE\n",
+                "TYPE ST_C :\n" +
+                "STRUCT RETAIN\n" +
+                "    x : BOOL;\n" +
+                "END_STRUCT\n" +
+                "END_TYPE\n");
+        }
+
+        [Fact]
+        public void StructRetain_LowercaseKeywords_UppercasedNotDeleted()
+        {
+            AssertLayout(
+                "TYPE ST_C : struct retain\n" +
+                "x : BOOL;\n" +
+                "end_struct\n" +
+                "END_TYPE\n",
+                "TYPE ST_C :\n" +
+                "STRUCT RETAIN\n" +
+                "    x : BOOL;\n" +
+                "END_STRUCT\n" +
+                "END_TYPE\n");
+        }
+
+        [Fact]
+        public void StructPersistent_ModifierStaysOnTheHeaderLine()
+        {
+            AssertLayout(
+                "TYPE ST_P : STRUCT PERSISTENT\nx : BOOL;\nEND_STRUCT\nEND_TYPE\n",
+                "TYPE ST_P :\n" +
+                "STRUCT PERSISTENT\n" +
+                "    x : BOOL;\n" +
+                "END_STRUCT\n" +
+                "END_TYPE\n");
+        }
+
+        [Fact]
+        public void StructHeader_TrailingComment_IsKeptOnTheHeaderLine()
+        {
+            AssertLayout(
+                "TYPE S : STRUCT // header comment\nx : BOOL;\nEND_STRUCT\nEND_TYPE\n",
+                "TYPE S :\n" +
+                "STRUCT    // header comment\n" +
+                "    x : BOOL;\n" +
+                "END_STRUCT\n" +
+                "END_TYPE\n");
+        }
+
+        [Fact]
+        public void UnionRetain_ModifierStaysOnTheHeaderLine()
+        {
+            AssertLayout(
+                "TYPE U_R : UNION RETAIN\ni : INT;\nEND_UNION\nEND_TYPE\n",
+                "TYPE U_R :\n" +
+                "UNION RETAIN\n" +
+                "    i : INT;\n" +
+                "END_UNION\n" +
+                "END_TYPE\n");
+        }
+
+        [Fact]
         public void EnumBody_MultiLine_KeepsLineBreaks_NormalizesIndent()
         {
             // '(' and ');' belong at the TYPE declaration's indent, the values one

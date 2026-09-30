@@ -1301,6 +1301,15 @@ namespace STFormatterCore.Parser
             var body = new StructBody();
             body.AddToken(Advance()); // STRUCT
 
+            // TwinCAT 3 declares whole-struct retain data as "STRUCT RETAIN"
+            // (optionally PERSISTENT) — the Beckhoff Retain Handler then manages
+            // every instance of the type. These modifiers belong to the header:
+            // consume them right after STRUCT, otherwise they fall into the
+            // stray-token branch below and the formatter drops them.
+            while (Current.Kind == TokenKind.Keyword_Retain ||
+                   Current.Kind == TokenKind.Keyword_Persistent)
+                body.AddToken(Advance());
+
             while (!IsAtEnd && Current.Kind != TokenKind.Keyword_EndStruct)
             {
                 if (Current.Kind == TokenKind.Identifier)
@@ -1351,6 +1360,12 @@ namespace STFormatterCore.Parser
         {
             var body = new UnionBody();
             body.AddToken(Advance()); // UNION
+
+            // Same header modifiers as STRUCT: "UNION RETAIN" keeps the modifier
+            // next to the opener instead of losing it in the stray-token branch.
+            while (Current.Kind == TokenKind.Keyword_Retain ||
+                   Current.Kind == TokenKind.Keyword_Persistent)
+                body.AddToken(Advance());
 
             while (!IsAtEnd && Current.Kind != TokenKind.Keyword_EndUnion)
             {
