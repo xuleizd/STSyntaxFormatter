@@ -23,11 +23,11 @@ namespace STFormatterCLI
             var formatterOptions = new FormatterOptions
             {
                 IndentSize = opts.Indentation,
-                AlignDeclarations = opts.AlignDeclarations,
-                KeepEmptyLines = opts.KeepEmptyLines,
             };
 
             // Optional overrides: unspecified values keep the engine defaults.
+            if (opts.AlignDeclarations.HasValue) formatterOptions.AlignDeclarations = opts.AlignDeclarations.Value;
+            if (opts.KeepEmptyLines.HasValue) formatterOptions.KeepEmptyLines = opts.KeepEmptyLines.Value;
             if (opts.UseSpaces.HasValue) formatterOptions.UseSpacesInsteadOfTab = opts.UseSpaces.Value;
             if (opts.OperatorSpacing.HasValue) formatterOptions.OperatorSpacing = opts.OperatorSpacing.Value;
             if (opts.CommaSpacing.HasValue) formatterOptions.CommaSpacing = opts.CommaSpacing.Value;

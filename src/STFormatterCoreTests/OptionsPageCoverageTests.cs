@@ -13,10 +13,11 @@ namespace STFormatterCoreTests
     /// <summary>
     /// Systematic coverage of every option shown in the VSIX options page
     /// (工具 → 选项 → ST 格式化, see STFormatterVSIX/OptionsPage.cs).
-    /// One group per option, one test per value. The page exposes 14 settings;
+    /// One group per option, one test per value. The page exposes 15 settings;
     /// 13 of them map to FormatterOptions and are covered behaviorally here,
-    /// plus a mapping guard test. "保存时自动格式化" (FormatOnSave) is VSIX
-    /// runtime behavior (document-save hook) and cannot be exercised in Core.
+    /// plus a mapping guard test. "保存时自动格式化" (FormatOnSave) and
+    /// "写回前等价性校验" (ValidateOutput) are VSIX runtime behavior (save hook /
+    /// write-back guard) and cannot be exercised in Core.
     /// </summary>
     public class OptionsPageCoverageTests
     {

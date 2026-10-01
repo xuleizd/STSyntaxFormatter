@@ -36,6 +36,7 @@ namespace STFormatterVSIX
 
         // 行为
         private bool formatOnSave = true;
+        private bool validateOutput = true;
 
         [Category("缩进")]
         [DisplayName("使用空格")]
@@ -171,6 +172,16 @@ namespace STFormatterVSIX
         {
             get { return formatOnSave; }
             set { formatOnSave = value; }
+        }
+
+        [Category("行为")]
+        [DisplayName("写回前等价性校验")]
+        [Description("是：格式化结果通过 token/语法树/注释三重比对后才写回，校验失败保留原文（强烈建议保持开启）。否：跳过校验直接写回（仅在校验器误报时临时关闭）。")]
+        [TypeConverter(typeof(ChineseBooleanConverter))]
+        public bool ValidateOutput
+        {
+            get { return validateOutput; }
+            set { validateOutput = value; }
         }
 
         /// <summary>

@@ -64,13 +64,14 @@ STFormatterCLI.exe -p <目录>            # 递归格式化目录下全部 *.TcP
 
 --indentation <n>                       # 缩进列数（默认 4）
 --windowslineending / --unixlineending  # 换行符（默认 Auto，跟随原文件风格）
---align-declarations                    # VAR/STRUCT 声明冒号对齐
---keep-empty-lines                      # 保留源码空行（默认开）
+--align-declarations true|false         # VAR/STRUCT 声明冒号对齐（默认 true）
+--keep-empty-lines true|false           # 保留源码空行（默认 true；false = 2+ 连续空行合并成 1）
 --type-case upper|lower|preserve        # 类型名大小写（默认 preserve）
+--skip-validation                       # 跳过写回前的等价性校验（默认开，校验失败的文件保持原样不动）
 -v                                      # 详细输出
 ```
 
-> **注意**：CLI 直接覆盖原文件、不生成 `.bak`，批量处理前请先提交到版本库或自行备份。
+> **注意**：CLI 直接覆盖原文件、不生成 `.bak`，批量处理前请先提交到版本库或自行备份。默认开启的**等价性校验**（token/语法树/注释三重比对）保证格式化绝不会改坏代码——校验不通过的文件会被拒绝写回并计入退出码 1。
 
 ## 从源码构建
 
@@ -96,6 +97,8 @@ STFormatterCLI.exe -p <目录>            # 递归格式化目录下全部 *.TcP
 
 ## 版本历史（摘要）
 
+- **1.8.9** — VSIX 保存路径收敛为单条（消除竞态）；等价性校验接入编辑器写回；失败 InfoBar 提示（带版本号）；CLI 删除无效占位选项、bool 选项可显式关闭；testdata 全样例输出基线
+- **1.8.8** — 等价性校验器 + 快照测试体系；修 `IMPLEMENTS` 列表丢逗号、VAR 成员访问修饰符（PUBLIC/PRIVATE）排版断裂
 - **1.8.7** — 修 `STRUCT RETAIN` 修饰符被删；STRUCT/UNION 头行行内注释不再丢失
 - **1.8.6** — 修 `REPEAT...UNTIL` 吞掉后续语句、凭空补分号的问题；新增全样例不变式扫描
 - **1.8.5** — 修块结束关键字（如 `END_STRUCT`）上方注释的缩进归属

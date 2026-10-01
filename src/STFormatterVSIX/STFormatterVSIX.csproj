@@ -58,6 +58,7 @@
     <Compile Include="ChineseOptionConverters.cs" />
     <Compile Include="Commands\FormatDocumentCommand.cs" />
     <Compile Include="ContentType\STContentTypeDefinition.cs" />
+    <Compile Include="InfoBarService.cs" />
     <Compile Include="OptionsPage.cs" />
     <Compile Include="STFormatterPackage.cs" />
     <Compile Include="TcPouDocument.cs" />

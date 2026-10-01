@@ -189,5 +189,124 @@ namespace STFormatterCLITests
                 "comments were dropped from samples that are not already corrupt:\n" +
                 string.Join("\n", unexpectedLoss));
         }
+
+        /// <summary>
+        /// Byte-exact baseline over the whole corpus: after formatting (once, with
+        /// the fixed options above), every sample's resulting file must hash to the
+        /// committed baseline in testdata-baseline.txt. Any formatter change that
+        /// touches real-world output now shows up as an explicit baseline diff the
+        /// author must review and update — mirroring what the snapshot suite does
+        /// per construct, but across all ~250 real samples. The known-corrupt
+        /// samples are recorded as REFUSED (the validator rejects them, which is
+        /// the correct outcome).
+        /// Update the baseline with STF_BASELINE_UPDATE=1 and review the git diff.
+        /// </summary>
+        [Fact]
+        public void Corpus_FormattedOutput_MatchesCommittedBaseline()
+        {
+            var root = Path.Combine(RepoRoot(), "testdata");
+            Assert.True(Directory.Exists(root), $"testdata corpus not found at {root}");
+
+            var exts = new[] { ".tcpou", ".tcdut", ".tcgvl" };
+            var files = Directory.GetFiles(root, "*.*", SearchOption.AllDirectories)
+                .Where(f => exts.Contains(Path.GetExtension(f).ToLowerInvariant()))
+                .Where(f => !f.Replace('\\', '/').Contains("/testdata/backup/"))
+                .OrderBy(f => f, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            var options = new FormatterOptions
+            {
+                IndentSize = 4,
+                AlignDeclarations = true,
+                KeepEmptyLines = true,
+                LineEnding = LineEnding.CRLF
+            };
+
+            // Lives in the project tree (committed) — NOT next to the assembly,
+            // which xUnit shadow-copies to a temp directory.
+            var baselinePath = Path.Combine(
+                RepoRoot(), "src", "STFormatterCLITests", "testdata-baseline.txt");
+            var update = Environment.GetEnvironmentVariable("STF_BASELINE_UPDATE") == "1";
+
+            var baseline = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            if (!update && File.Exists(baselinePath))
+            {
+                foreach (var line in File.ReadAllLines(baselinePath))
+                {
+                    if (string.IsNullOrWhiteSpace(line) || line.StartsWith("#")) continue;
+                    int tab = line.IndexOf('\t');
+                    Assert.True(tab > 0, $"malformed baseline line: {line}");
+                    baseline[line.Substring(0, tab)] = line.Substring(tab + 1);
+                }
+            }
+
+            var newBaseline = new List<string>();
+            var mismatches = new List<string>();
+
+            foreach (var src in files)
+            {
+                var name = src.Substring(root.Length + 1).Replace('\\', '/');
+                var tmp = Path.Combine(Path.GetTempPath(),
+                    "sweepbase_" + Guid.NewGuid().ToString("N") + Path.GetExtension(src));
+                try
+                {
+                    File.Copy(src, tmp);
+                    if (!TcPouFile.IsSupportedFile(tmp)) continue;
+
+                    string recorded;
+                    try
+                    {
+                        var pou = new TcPouFile(tmp);
+                        pou.Format(options);
+                        pou.Save();
+                        using (var sha = System.Security.Cryptography.SHA256.Create())
+                        using (var stream = File.OpenRead(tmp))
+                        {
+                            recorded = Convert.ToBase64String(sha.ComputeHash(stream));
+                        }
+                    }
+                    catch (InvalidOperationException ex) when (ex.Message.Contains("等价性校验未通过"))
+                    {
+                        Assert.True(KnownCorruptSamples.Contains(Path.GetFileName(name)),
+                            $"{name} was refused by the validator but is not a known-corrupt sample: {ex.Message}");
+                        recorded = "REFUSED";
+                    }
+
+                    newBaseline.Add(name + "\t" + recorded);
+
+                    if (update) continue;
+
+                    if (!baseline.TryGetValue(name, out var expected))
+                        mismatches.Add($"{name}: not in baseline (run STF_BASELINE_UPDATE=1)");
+                    else if (!string.Equals(expected, recorded, StringComparison.Ordinal))
+                        mismatches.Add($"{name}: output changed — review and update the baseline");
+                }
+                finally
+                {
+                    try { File.Delete(tmp); } catch (IOException) { }
+                }
+            }
+
+            if (update)
+            {
+                File.WriteAllLines(baselinePath,
+                    new[] { "# testdata corpus output baseline (STF_BASELINE_UPDATE=1 to regenerate)" }
+                    .Concat(newBaseline));
+                _out.WriteLine($"BASELINE_WRITTEN {newBaseline.Count} entries to {baselinePath}");
+                return;
+            }
+
+            var stale = baseline.Keys
+                .Where(k => !newBaseline.Any(l => l.StartsWith(k + "\t", StringComparison.OrdinalIgnoreCase)))
+                .ToList();
+            Assert.True(stale.Count == 0,
+                "baseline contains samples that no longer exist (regenerate it):\n" +
+                string.Join("\n", stale));
+
+            Assert.True(mismatches.Count == 0,
+                $"{mismatches.Count} sample(s) no longer match the committed baseline.\n" +
+                "If the change is intended, rerun with STF_BASELINE_UPDATE=1 and review the git diff.\n" +
+                string.Join("\n", mismatches));
+        }
     }
 }

@@ -15,10 +15,16 @@ namespace STFormatterVSIX
 {
     /// <summary>
     /// VS package that hosts the ST Syntax Formatter extension.
-    /// Registers commands, options page, and format-on-save events.
+    /// Registers commands, options page, and format-on-save.
+    ///
+    /// Format-on-save runs on ONE path only (1.8.9): RunningDocEvents.OnBeforeSave
+    /// formats the editor buffer, then VS itself saves the formatted buffer. The
+    /// old second path (DocumentSaved → format → Task.Delay(150) → save again,
+    /// guarded by an autoSaveTriggered flag and a 2-second debounce) was removed:
+    /// two paths racing on the same document is a correctness hazard for no gain.
     /// </summary>
     [PackageRegistration(UseManagedResourcesOnly = true, AllowsBackgroundLoading = true)]
-    [InstalledProductRegistration("ST 格式化器", "TwinCAT3 ST 代码格式化工具", "1.4.0")]
+    [InstalledProductRegistration("ST 格式化器", "TwinCAT3 ST 代码格式化工具", "1.8.9")]
     [ProvideOptionPage(typeof(OptionsPage), "ST 格式化", "常规", 0, 0, true)]
     [ProvideMenuResource("Menus.ctmenu", 1)]
     [Guid(STFormatterPackage.PackageGuidString)]
@@ -43,23 +49,6 @@ namespace STFormatterVSIX
         private static RunningDocEvents runningDocEvents;
         private static uint rdtCookie;
 
-        /// <summary>
-        /// DTE document events for format-on-save via DocumentSaved.
-        /// </summary>
-        private static DocumentEvents documentEvents;
-
-        /// <summary>
-        /// Path and time of the last automatic save, used to prevent loops.
-        /// </summary>
-        private static string lastAutoSavePath;
-        private static DateTime lastAutoSaveTime = DateTime.MinValue;
-
-        /// <summary>
-        /// True while an automatic save triggered by us is in flight.
-        /// The DocumentSaved event raised by that save is ignored.
-        /// </summary>
-        private static bool autoSaveTriggered;
-
         #region Package Members
 
         /// <summary>
@@ -77,19 +66,12 @@ namespace STFormatterVSIX
             // Register the format document command
             await FormatDocumentCommand.InitializeAsync(this);
 
-            // Register format-on-save events
+            // Register format-on-save (single path: OnBeforeSave)
             try
             {
                 runningDocumentTable = new RunningDocumentTable(this);
                 runningDocEvents = new RunningDocEvents(this);
                 rdtCookie = runningDocumentTable.Advise(runningDocEvents);
-
-                DTE dte = Package.GetGlobalService(typeof(DTE)) as DTE;
-                if (dte != null)
-                {
-                    documentEvents = dte.Events.DocumentEvents;
-                    documentEvents.DocumentSaved += OnDocumentSaved;
-                }
             }
             catch (Exception ex)
             {
@@ -98,104 +80,19 @@ namespace STFormatterVSIX
         }
 
         /// <summary>
-        /// Called after a document was saved. Formats the document via COM interfaces
-        /// (modifies editor buffer) and schedules one more save so the formatted content
-        /// is written to disk. The save is deferred until the DocumentSaved event has
-        /// finished dispatching, otherwise it would dead-lock the UI thread.
-        /// The DocumentSaved event raised by that automatic save is skipped via autoSaveTriggered.
-        /// </summary>
-        private void OnDocumentSaved(Document document)
-        {
-            try
-            {
-                ThreadHelper.ThrowIfNotOnUIThread();
-                HandleFormatOnSave(this, document);
-            }
-            catch (Exception)
-            {
-                // Silently ignore formatting errors on save
-            }
-        }
-
-        /// <summary>
-        /// Handles format-on-save: formats TwinCAT PLC files (.TcPOU, .TcDUT, .TcGVL)
-        /// via COM interfaces and re-saves if changed.
-        /// Uses debouncing and autoSaveTriggered flag to prevent loops.
-        /// </summary>
-        internal static void HandleFormatOnSave(AsyncPackage package, Document document)
-        {
-            ThreadHelper.ThrowIfNotOnUIThread();
-
-            string path = document.FullName;
-
-            // The DocumentSaved raised by our own automatic save: reset the
-            // flag and do nothing, the document was already formatted and saved.
-            if (autoSaveTriggered)
-            {
-                autoSaveTriggered = false;
-                return;
-            }
-
-            if (document.ProjectItem == null)
-                return;
-
-            // Object-type check first (Action/Method/Property/Transition opened on
-            // their own don't end in .TcPOU); fall back to path suffix. This mirrors
-            // TcBlack's IsPlcObject gate exactly.
-            if (!TcPouDocument.IsPlcObject(document.ProjectItem.Object)
-                && !TcPouDocument.IsTcPouFile(path))
-                return;
-
-            // Check if format-on-save is enabled
-            var options = (OptionsPage)package.GetDialogPage(typeof(OptionsPage));
-            if (!options.FormatOnSave)
-                return;
-
-            try
-            {
-                // Format via COM interfaces (modifies editor buffer, not disk file)
-                var formatFunc = CreateFormatFunc(options);
-                bool changed = TcPouDocument.FormatProjectItem(document.ProjectItem, formatFunc);
-                if (!changed)
-                    return;
-
-                // Debounce: never auto-save the same document twice quickly
-                bool recentlySaved =
-                    string.Equals(lastAutoSavePath, path, StringComparison.OrdinalIgnoreCase)
-                    && (DateTime.Now - lastAutoSaveTime).TotalSeconds < 2;
-                if (recentlySaved)
-                    return;
-
-                lastAutoSavePath = path;
-                lastAutoSaveTime = DateTime.Now;
-                autoSaveTriggered = true;
-
-                // Defer save to avoid deadlocking the UI thread
-                Task.Run(async () =>
-                {
-                    await Task.Delay(150);
-                    await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
-                    try
-                    {
-                        document.Save("");
-                    }
-                    catch (Exception)
-                    {
-                    }
-                });
-            }
-            catch (Exception ex)
-            {
-                ActivityLog.LogWarning("STFormatter", $"Format on save failed: {ex.Message}");
-            }
-        }
-
-        /// <summary>
-        /// Creates the format function that runs the Lexer → Parser → Formatter pipeline.
+        /// Creates the format function that runs the Lexer → Parser → Formatter
+        /// pipeline behind three guards (1.8.9, the CSharpier "never corrupt the
+        /// buffer" policy):
+        ///   1. engine exceptions → keep the original text, show an InfoBar;
+        ///   2. empty or unchanged output → keep the original text;
+        ///   3. equivalence validation (token/tree/comment comparison) fails →
+        ///      keep the original text, show an InfoBar. A refused file always
+        ///      beats a corrupted one.
         /// </summary>
         internal static Func<string, string> CreateFormatFunc(OptionsPage options)
         {
             var formatterOptions = options.ToFormatterOptions();
+            bool validate = options.ValidateOutput;
             return (string source) =>
             {
                 if (string.IsNullOrWhiteSpace(source))
@@ -208,13 +105,68 @@ namespace STFormatterVSIX
                 // these at the top level (IsVarKeyword routes every VAR variant to
                 // ParseVarBlock, IsBareStatementStart routes statement lists to
                 // ParseStatement), so no wrapper is needed.
-                var lexer = new STFormatterCore.Lexer.STLexer(source);
-                var tokens = lexer.Tokenize();
-                var parser = new STFormatterCore.Parser.STParser(tokens);
-                var cst = parser.Parse();
-                var formatter = new STFormatterCore.Formatter.STFormatter(formatterOptions);
-                return formatter.Format(cst, source);
+                string formatted;
+                try
+                {
+                    var lexer = new STFormatterCore.Lexer.STLexer(source);
+                    var tokens = lexer.Tokenize();
+                    var parser = new STFormatterCore.Parser.STParser(tokens);
+                    var cst = parser.Parse();
+                    var formatter = new STFormatterCore.Formatter.STFormatter(formatterOptions);
+                    formatted = formatter.Format(cst, source);
+                }
+                catch (Exception ex)
+                {
+                    ReportFormatFailure($"格式化引擎异常，已保留原文（{ex.Message}）");
+                    return source;
+                }
+
+                if (string.IsNullOrEmpty(formatted) || formatted == source)
+                    return source;
+
+                if (validate)
+                {
+                    var validation = STFormatterCore.Validation.FormattingValidator.Validate(
+                        source, formatted, formatterOptions);
+                    if (!validation.IsValid)
+                    {
+                        ReportFormatFailure($"等价性校验未通过，已保留原文（{validation.FailureMessage}）");
+                        return source;
+                    }
+                }
+
+                return formatted;
             };
+        }
+
+        /// <summary>
+        /// Surfaces a formatting failure to the user (InfoBar with the engine
+        /// version, debounced) and always to the activity log.
+        /// </summary>
+        [SuppressMessage("Usage", "VSTHRD010",
+            Justification = "The method itself dispatches to the UI thread via ThreadHelper.")]
+        internal static void ReportFormatFailure(string message)
+        {
+            try
+            {
+                ActivityLog.LogWarning("STFormatter", message);
+            }
+            catch
+            {
+            }
+
+            if (ThreadHelper.CheckAccess())
+            {
+                InfoBarService.Show(message);
+            }
+            else
+            {
+                ThreadHelper.JoinableTaskFactory.Run(async () =>
+                {
+                    await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
+                    InfoBarService.Show(message);
+                });
+            }
         }
 
         #endregion
@@ -235,8 +187,13 @@ namespace STFormatterVSIX
         }
 
         /// <summary>
-        /// Called before a document is saved. Formats the editor buffer via COM interfaces
-        /// so that VS saves the formatted content to disk.
+        /// Called before a document is saved. Formats the document buffer via COM
+        /// interfaces so that VS saves the formatted content to disk.
+        /// There is no path-suffix gate here on purpose: Action/Method/Property/
+        /// Transition documents have monikers that do not end in .TcPOU —
+        /// FormatDocument finds the document by moniker and FormatProjectItem
+        /// applies the object-type gate (IsPlcObject), so non-PLC documents are a
+        /// cheap no-op.
         /// </summary>
         public int OnBeforeSave(uint docCookie)
         {
@@ -247,8 +204,7 @@ namespace STFormatterVSIX
                 var rdt = new RunningDocumentTable(package);
                 RunningDocumentInfo info = rdt.GetDocumentInfo(docCookie);
                 string path = info.Moniker;
-
-                if (!TcPouDocument.IsTcPouFile(path))
+                if (string.IsNullOrEmpty(path))
                     return VSConstants.S_OK;
 
                 var options = (OptionsPage)package.GetDialogPage(typeof(OptionsPage));
@@ -259,8 +215,10 @@ namespace STFormatterVSIX
                 var formatFunc = STFormatterPackage.CreateFormatFunc(options);
                 TcPouDocument.FormatDocument(path, formatFunc);
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+                // Never block the save itself.
+                STFormatterPackage.ReportFormatFailure($"保存时格式化失败，已保留原文（{ex.Message}）");
             }
 
             return VSConstants.S_OK;
@@ -299,7 +257,7 @@ namespace STFormatterVSIX
             => VSConstants.S_OK;
 
         public int OnAfterDocumentWindowShow(
-            uint docCookie, int fFirstShow, IVsWindowFrame pFrame)
+            uint docCookie, IVsWindowFrame pFrame)
             => VSConstants.S_OK;
     }
 }
