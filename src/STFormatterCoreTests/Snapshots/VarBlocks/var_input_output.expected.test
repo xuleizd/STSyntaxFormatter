@@ -1,0 +1,13 @@
+FUNCTION_BLOCK FB_Demo
+VAR_INPUT
+    bExecute : BOOL;
+    nValue   : INT;
+END_VAR
+VAR_OUTPUT
+    bDone   : BOOL;
+    nResult : DINT;
+END_VAR
+VAR_IN_OUT
+    stData : ST_Data;
+END_VAR
+END_FUNCTION_BLOCK

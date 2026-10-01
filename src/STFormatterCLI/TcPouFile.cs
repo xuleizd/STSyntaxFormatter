@@ -49,45 +49,45 @@ namespace STFormatterCLI
                         || _doc.SelectSingleNode("//Array[@Name='TextLines']") != null;
         }
         
-        public void Format(FormatterOptions options)
+        public void Format(FormatterOptions options, bool validate = true)
         {
             // Override line ending if configured
             if (options.LineEnding == LineEnding.CRLF) _lineEnding = "\r\n";
             else if (options.LineEnding == LineEnding.LF) _lineEnding = "\n";
-            
+
             if (_isOldFormat)
-                FormatOldFormat(options);
+                FormatOldFormat(options, validate);
             else
-                FormatNewFormat(options);
+                FormatNewFormat(options, validate);
         }
         
         /// <summary>
         /// Format new-style TcPlcObject files with Declaration and Implementation/ST CDATA sections.
         /// </summary>
-        private void FormatNewFormat(FormatterOptions options)
+        private void FormatNewFormat(FormatterOptions options, bool validate)
         {
             // Format all Declaration nodes
-            FormatNodes(".//Declaration", options);
+            FormatNodes(".//Declaration", options, validate);
             // Format all Implementation/ST nodes (bare ST code - needs wrapping)
-            FormatNodesWrapped(".//Implementation/ST", options);
+            FormatNodesWrapped(".//Implementation/ST", options, validate);
         }
         
         /// <summary>
         /// Format old-style Single/Array/TextLines files.
         /// </summary>
-        private void FormatOldFormat(FormatterOptions options)
+        private void FormatOldFormat(FormatterOptions options, bool validate)
         {
             // Format Implementation text (under Object/Implementation/TextDocument/TextLines)
-            FormatOldTextLines("//Single[@Name='Object']/Single[@Name='Implementation']/Single[@Name='TextDocument']/Array[@Name='TextLines']", options, isImplementation: true);
-            
+            FormatOldTextLines("//Single[@Name='Object']/Single[@Name='Implementation']/Single[@Name='TextDocument']/Array[@Name='TextLines']", options, validate, isImplementation: true);
+
             // Format Declaration/Interface text (under Object/Interface/TextDocument/TextLines)
-            FormatOldTextLines("//Single[@Name='Object']/Single[@Name='Interface']/Single[@Name='TextDocument']/Array[@Name='TextLines']", options, isImplementation: false);
+            FormatOldTextLines("//Single[@Name='Object']/Single[@Name='Interface']/Single[@Name='TextDocument']/Array[@Name='TextLines']", options, validate, isImplementation: false);
         }
         
         /// <summary>
         /// Extracts text from old-format TextLines array, formats it, and writes back.
         /// </summary>
-        private void FormatOldTextLines(string xpath, FormatterOptions options, bool isImplementation)
+        private void FormatOldTextLines(string xpath, FormatterOptions options, bool validate, bool isImplementation)
         {
             var textLinesNode = _doc.SelectSingleNode(xpath);
             if (textLinesNode == null) return;
@@ -116,7 +116,7 @@ namespace STFormatterCLI
             
             // Implementation code is a bare statement list; the core formatter
             // parses it natively and keeps outermost statements at column 0
-            string formatted = FormatCode(sourceCode, options);
+            string formatted = FormatCode(sourceCode, options, validate);
             
             // Split formatted output back into lines
             var formattedLines = formatted.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None);
@@ -206,18 +206,18 @@ namespace STFormatterCLI
         /// <summary>
         /// Format CDATA sections using the standard XPath approach (new format).
         /// </summary>
-        private void FormatNodes(string xpath, FormatterOptions options)
+        private void FormatNodes(string xpath, FormatterOptions options, bool validate)
         {
             var nodes = _doc.SelectNodes(xpath);
             if (nodes == null) return;
-            
+
             foreach (XmlNode node in nodes)
             {
                 string sourceCode = node.InnerText;
                 if (string.IsNullOrWhiteSpace(sourceCode)) continue;
-                
-                string formatted = FormatCode(sourceCode, options);
-                
+
+                string formatted = FormatCode(sourceCode, options, validate);
+
                 // Write back as CDATA
                 node.InnerXml = $"<![CDATA[{formatted}]]>";
             }
@@ -228,34 +228,48 @@ namespace STFormatterCLI
         /// The core formatter parses bare statement lists natively, so no temporary
         /// PROGRAM wrapper is needed and outermost statements stay at column 0.
         /// </summary>
-        private void FormatNodesWrapped(string xpath, FormatterOptions options)
+        private void FormatNodesWrapped(string xpath, FormatterOptions options, bool validate)
         {
             var nodes = _doc.SelectNodes(xpath);
             if (nodes == null) return;
-            
+
             foreach (XmlNode node in nodes)
             {
                 string sourceCode = node.InnerText;
                 if (string.IsNullOrWhiteSpace(sourceCode)) continue;
-                
-                string formatted = FormatCode(sourceCode, options);
-                
+
+                string formatted = FormatCode(sourceCode, options, validate);
+
                 // Write back as CDATA
                 node.InnerXml = $"<![CDATA[{formatted}]]>";
             }
         }
         
         /// <summary>
-        /// Runs the formatter pipeline: Lexer → Parser → Formatter.
+        /// Runs the formatter pipeline: Lexer → Parser → Formatter, then the
+        /// equivalence validation. Validation failure throws before any write-back
+        /// happens — the caller's catch skips Save(), so the file on disk stays
+        /// untouched (the same guarantee CSharpier's IFormattingValidator gives:
+        /// a refused file beats a corrupted one).
         /// </summary>
-        private string FormatCode(string sourceCode, FormatterOptions options)
+        private string FormatCode(string sourceCode, FormatterOptions options, bool validate)
         {
             var lexer = new STLexer(sourceCode);
             var tokens = lexer.Tokenize();
             var parser = new STParser(tokens);
             var cst = parser.Parse();
             var formatter = new STFormatterCore.Formatter.STFormatter(options);
-            return formatter.Format(cst, sourceCode);
+            string formatted = formatter.Format(cst, sourceCode);
+
+            if (validate)
+            {
+                var result = STFormatterCore.Validation.FormattingValidator.Validate(sourceCode, formatted, options);
+                if (!result.IsValid)
+                    throw new InvalidOperationException(
+                        $"等价性校验未通过，已拒绝写回（--skip-validation 可跳过）：{result.FailureMessage}");
+            }
+
+            return formatted;
         }
         
         public void Save()

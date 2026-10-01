@@ -1,0 +1,9 @@
+PROGRAM Main
+VAR
+nArray:ARRAY[1..10] OF INT := [1,2,3];
+sText:STRING(50) := 'hello';
+tDelay:T#1s500ms;
+rFactor:REAL := 1.5;
+eState:E_State := E_State.Idle;
+END_VAR
+END_PROGRAM

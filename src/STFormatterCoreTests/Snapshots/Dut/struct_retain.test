@@ -1,0 +1,6 @@
+TYPE ST_RetainData:
+STRUCT RETAIN
+nCounter:DINT;
+sLabel:STRING(32);
+END_STRUCT
+END_TYPE

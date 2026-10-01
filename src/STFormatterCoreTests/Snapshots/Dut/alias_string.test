@@ -1,0 +1,2 @@
+TYPE TName : STRING(50);
+END_TYPE

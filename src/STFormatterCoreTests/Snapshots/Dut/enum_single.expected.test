@@ -1,0 +1,3 @@
+TYPE E_State :
+(Idle, Running, Error);
+END_TYPE

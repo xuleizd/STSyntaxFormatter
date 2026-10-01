@@ -1,0 +1,4 @@
+program Main
+var x:int; end_var
+x:=1;
+end_program

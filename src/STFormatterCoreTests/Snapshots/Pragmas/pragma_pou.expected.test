@@ -1,0 +1,6 @@
+{attribute 'hide'}
+PROGRAM Hidden
+VAR
+    x : INT;
+END_VAR
+END_PROGRAM

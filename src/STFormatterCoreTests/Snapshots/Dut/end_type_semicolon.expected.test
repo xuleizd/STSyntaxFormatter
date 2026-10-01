@@ -1,0 +1,2 @@
+TYPE TSimple : BOOL;
+END_TYPE;

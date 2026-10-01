@@ -786,6 +786,41 @@ END_FUNCTION_BLOCK";
         #region 39. VAR with RETAIN modifier
 
         [Fact]
+        public void FunctionBlock_Implements_CommasAreRealTokens()
+        {
+            // The commas of an IMPLEMENTS list belong to the DeclarationBlock
+            // tokens — they used to be consumed by Match() and dropped, and the
+            // formatter then emitted uncompilable "IMPLEMENTS I_A I_B".
+            var source = "FUNCTION_BLOCK FB_Drive IMPLEMENTS I_Motion, I_Diag\nVAR\nnState : INT;\nEND_VAR\nEND_FUNCTION_BLOCK";
+            var unit = Parse(source);
+            var fb = unit.Children.OfType<DeclarationBlock>().FirstOrDefault();
+            Assert.NotNull(fb);
+            Assert.Equal(2, fb.ImplementsNames.Count);
+            // One comma separates two interfaces, and it must be a body token.
+            Assert.Equal(1, fb.Tokens.Count(t => t.Kind == TokenKind.Comma));
+        }
+
+        [Fact]
+        public void VarBlock_MemberAccessModifier_BelongsToTheDeclaration()
+        {
+            // PUBLIC in front of a member name is a declaration prefix token, not
+            // an unknown construct: the recovery branch used to swallow it and the
+            // visitor then split the type onto its own line.
+            var source = "FUNCTION_BLOCK FB_Demo\nVAR\nPUBLIC nPublic : INT;\nEND_VAR\nEND_FUNCTION_BLOCK";
+            var unit = Parse(source);
+            var fb = unit.Children.OfType<DeclarationBlock>().FirstOrDefault();
+            Assert.NotNull(fb);
+            var varBlock = fb.Children.OfType<VarBlock>().FirstOrDefault();
+            Assert.NotNull(varBlock);
+            var decl = varBlock.Children.OfType<VarDeclaration>().FirstOrDefault();
+            Assert.NotNull(decl);
+            Assert.Equal("nPublic", decl.Name);
+            Assert.Contains(decl.Tokens, t => t.Kind == TokenKind.Keyword_Public);
+            // The declaration must not have landed in a recovery node.
+            Assert.DoesNotContain(varBlock.Children, c => c is UnknownNode);
+        }
+
+        [Fact]
         public void VarBlock_WithRetainModifier()
         {
             var source = "PROGRAM P\nVAR RETAIN\n    counter : INT;\nEND_VAR\nEND_PROGRAM";

@@ -1,0 +1,4 @@
+// leading comment
+x := 1;
+// comment between statements
+y := 2;

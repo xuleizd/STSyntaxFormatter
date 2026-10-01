@@ -21,3 +21,6 @@ testdata/*.txt
 testdata/*.before
 testdata/**/*.before
 testdata/backup/
+
+# snapshot test diagnostics (generated on failure)
+*.actual.test

@@ -1,0 +1,4 @@
+s1:='hello';
+s2:='It''s ok';
+ws1:="wide string";
+s3:='Mixed ''Quotes'' and ""doubles""';

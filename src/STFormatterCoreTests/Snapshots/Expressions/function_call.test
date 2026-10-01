@@ -1,0 +1,3 @@
+nResult:=MAX(1,2,3);
+rVal:=ABS(a-SQRT(b*b+c*c));
+s2:=CONCAT(s1,'suffix');

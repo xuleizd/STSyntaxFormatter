@@ -504,6 +504,32 @@ namespace STFormatterCoreTests
                 "member declaration must be indented inside VAR");
         }
 
+        [Fact]
+        public void FunctionBlock_ImplementsList_KeepsCommas()
+        {
+            // The parser used to consume the commas with Match() without keeping
+            // them, and formatting produced "IMPLEMENTS I_Motion I_Diag" — code
+            // that no longer compiles. The commas must survive verbatim.
+            var result = Format("FUNCTION_BLOCK FB_Drive IMPLEMENTS I_Motion, I_Diag\nVAR\nnState : INT;\nEND_VAR\nEND_FUNCTION_BLOCK");
+            Assert.Contains("IMPLEMENTS I_Motion, I_Diag", result);
+            // And the whole header stays on one line.
+            Assert.Contains("FUNCTION_BLOCK FB_Drive IMPLEMENTS I_Motion, I_Diag", result);
+        }
+
+        [Fact]
+        public void VarBlock_MemberAccessModifiers_StayOnTheDeclarationLine()
+        {
+            // TwinCAT 3 allows PUBLIC/PRIVATE/PROTECTED/INTERNAL in front of a
+            // member name. They used to fall into the parser's recovery branch
+            // and came back verbatim with the type split onto its own line.
+            var source = "FUNCTION_BLOCK FB_Demo\nVAR\nPUBLIC nPublic:INT;\nPRIVATE nPrivate:INT;\nplain:INT;\nEND_VAR\nEND_FUNCTION_BLOCK";
+            var result = Format(source);
+            Assert.Contains("    PUBLIC nPublic   : INT;", result);
+            Assert.Contains("    PRIVATE nPrivate : INT;", result);
+            // Colon alignment spans modified and plain members alike.
+            Assert.Contains("    plain            : INT;", result);
+        }
+
         #endregion
 
         #region 17. FUNCTION formatting

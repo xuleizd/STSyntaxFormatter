@@ -1,0 +1,2 @@
+FB_Motor(nIndex := 1, rSpeed := 100.0, bEnable := TRUE);
+FB_Reset();

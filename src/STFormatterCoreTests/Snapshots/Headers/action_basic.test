@@ -1,0 +1,4 @@
+ACTION ResetCounters
+nA:=0;
+nB:=0;
+END_ACTION

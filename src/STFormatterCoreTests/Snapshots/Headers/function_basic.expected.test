@@ -1,0 +1,9 @@
+FUNCTION F_Calc : INT
+VAR_INPUT
+    nIn : INT;
+END_VAR
+VAR
+    nLocal : INT;
+END_VAR
+    F_Calc := nIn * 2;
+END_FUNCTION

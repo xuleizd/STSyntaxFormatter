@@ -269,15 +269,19 @@ namespace STFormatterCore.Parser
             if (Current.Kind == TokenKind.Keyword_Implements)
             {
                 node.AddToken(Advance()); // IMPLEMENTS
-                // Parse comma-separated list
-                do
+                // Comma-separated list. The commas are real tokens and must be
+                // kept in Tokens: Match() used to consume them silently, and the
+                // formatter then emitted "IMPLEMENTS I_A I_B" — uncompilable.
+                while (Current.Kind == TokenKind.Identifier)
                 {
-                    if (Current.Kind == TokenKind.Identifier)
-                    {
-                        node.ImplementsNames.Add(Current.Text);
+                    node.ImplementsNames.Add(Current.Text);
+                    node.AddToken(Advance());
+
+                    if (Current.Kind == TokenKind.Comma)
                         node.AddToken(Advance());
-                    }
-                } while (Match(TokenKind.Comma));
+                    else
+                        break;
+                }
             }
         }
 
@@ -330,6 +334,16 @@ namespace STFormatterCore.Parser
 
         #region VAR Blocks
 
+        /// <summary>
+        /// TwinCAT 3 member access modifiers that may prefix a declaration name
+        /// inside a VAR block (PUBLIC nCount : INT;).
+        /// </summary>
+        private static bool IsVarAccessModifier(TokenKind kind) =>
+            kind == TokenKind.Keyword_Public ||
+            kind == TokenKind.Keyword_Private ||
+            kind == TokenKind.Keyword_Protected ||
+            kind == TokenKind.Keyword_Internal;
+
         private VarBlock ParseVarBlock()
         {
             var node = new VarBlock();
@@ -356,6 +370,14 @@ namespace STFormatterCore.Parser
                 {
                     node.AddChild(ParseVarDeclaration());
                 }
+                else if (IsVarAccessModifier(Current.Kind))
+                {
+                    // TwinCAT 3 member access modifiers prefix the name
+                    // (PUBLIC nCount : INT;). They belong to the declaration,
+                    // not to an unknown-token recovery node — verbatim output
+                    // there splits the type onto its own line.
+                    node.AddChild(ParseVarDeclaration());
+                }
                 else if (Current.Kind == TokenKind.Semicolon)
                 {
                     Advance(); // skip stray semicolons
@@ -379,6 +401,13 @@ namespace STFormatterCore.Parser
         private VarDeclaration ParseVarDeclaration()
         {
             var node = new VarDeclaration();
+
+            // TwinCAT 3 member access modifiers (PUBLIC / PRIVATE / PROTECTED /
+            // INTERNAL) may prefix the declaration name inside a VAR block. They
+            // are leading header tokens — the formatter writes them in front of
+            // the name and counts them into the colon alignment width.
+            while (IsVarAccessModifier(Current.Kind))
+                node.AddToken(Advance());
 
             // Name
             if (Current.Kind == TokenKind.Identifier)

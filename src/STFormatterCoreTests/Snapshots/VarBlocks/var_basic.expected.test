@@ -1,0 +1,6 @@
+PROGRAM Main
+VAR
+    x    : int;
+    name : string(20);
+END_VAR
+END_PROGRAM

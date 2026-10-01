@@ -1,0 +1,4 @@
+(* header *)x := 1; (* inline *)
+(* multi
+   line
+   block *)y := 2;

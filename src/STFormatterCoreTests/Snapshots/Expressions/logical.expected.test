@@ -1,0 +1,3 @@
+bOK := bReady AND bEnabled AND_THEN bSafety;
+bFail := bError OR bWarning OR_ELSE bFault;
+bInv := NOT bReady XOR bAlt;

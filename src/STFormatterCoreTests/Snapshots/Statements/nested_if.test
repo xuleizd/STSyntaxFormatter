@@ -1,0 +1,9 @@
+IF a>0 THEN
+IF b>0 THEN
+c:=1;
+ELSIF b<0 THEN
+c:=2;
+ELSE
+c:=3;
+END_IF
+END_IF

@@ -1,0 +1,3 @@
+IF (nValue > 100) AND (nValue < 200) AND (bEnabled) AND (NOT bError) AND (sState = 'RUN') AND (nCount > 0) AND (rTemp < 80.0) AND (nRetry < 3) THEN
+    x := 1;
+END_IF

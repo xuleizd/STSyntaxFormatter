@@ -1,0 +1,12 @@
+FOR i := 1 TO 100 DO
+    IF i = 5 THEN
+        CONTINUE;
+    END_IF
+    IF i > 10 THEN
+        EXIT;
+    END_IF
+    IF i < 0 THEN
+        RETURN;
+    END_IF
+    nSum := nSum + i;
+END_FOR

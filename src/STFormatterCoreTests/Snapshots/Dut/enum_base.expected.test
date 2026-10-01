@@ -1,0 +1,3 @@
+TYPE E_Color :
+(Red, Green, Blue) : INT;
+END_TYPE

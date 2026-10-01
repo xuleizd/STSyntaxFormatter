@@ -60,5 +60,8 @@ namespace STFormatterCLI
 
         [Option("blank-lines-around-blocks", HelpText = "Blank line around outermost IF/CASE/FOR/WHILE/REPEAT blocks (true/false, default: engine default)")]
         public bool? BlankLinesAroundBlocks { get; set; }
+
+        [Option("skip-validation", Default = false, HelpText = "Skip the equivalence validation (token/tree/comment comparison) that guards the write-back. Validation is on by default: a file that fails it is left untouched and reported as an error")]
+        public bool SkipValidation { get; set; }
     }
 }

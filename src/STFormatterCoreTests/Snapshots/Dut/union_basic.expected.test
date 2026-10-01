@@ -1,0 +1,6 @@
+TYPE U_Word :
+UNION
+    wValue  : WORD;
+    byBytes : ARRAY[0..1] OF BYTE;
+END_UNION
+END_TYPE

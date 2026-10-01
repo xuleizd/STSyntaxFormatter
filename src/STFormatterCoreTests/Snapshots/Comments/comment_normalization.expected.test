@@ -1,0 +1,4 @@
+// x
+// y with    extra spaces
+/// doc comment
+x := 1;

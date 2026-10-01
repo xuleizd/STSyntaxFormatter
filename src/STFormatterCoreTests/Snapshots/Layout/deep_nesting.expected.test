@@ -1,0 +1,11 @@
+IF a THEN
+    IF b THEN
+        IF c THEN
+            FOR i := 1 TO 2 DO
+                WHILE d DO
+                    d := FALSE;
+                END_WHILE
+            END_FOR
+        END_IF
+    END_IF
+END_IF

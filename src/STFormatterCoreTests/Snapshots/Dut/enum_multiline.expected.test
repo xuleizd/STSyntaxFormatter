@@ -1,0 +1,7 @@
+TYPE E_Language :
+(
+    English,
+    German,
+    Chinese
+)
+END_TYPE

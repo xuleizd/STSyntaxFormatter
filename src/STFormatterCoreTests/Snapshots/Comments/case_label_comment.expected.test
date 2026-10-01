@@ -1,0 +1,6 @@
+CASE n OF
+    1:    // single
+        x := 1;
+    2,3:    // multi label
+        x := 2;
+END_CASE

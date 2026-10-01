@@ -1,0 +1,9 @@
+IF nState = 1 THEN
+    x := 1;
+ELSIF nState = 2 THEN
+    x := 2;
+ELSIF nState = 3 THEN
+    x := 3;
+ELSE
+    x := 0;
+END_IF

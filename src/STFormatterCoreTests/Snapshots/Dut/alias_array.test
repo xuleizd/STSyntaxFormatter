@@ -1,0 +1,2 @@
+TYPE TAxisPositions:ARRAY[1..10] OF LREAL;
+END_TYPE

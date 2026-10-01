@@ -1,0 +1,3 @@
+WHILE nCount>0 DO
+nCount:=nCount-1;
+END_WHILE

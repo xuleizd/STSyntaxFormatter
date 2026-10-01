@@ -26,11 +26,13 @@ namespace STFormatterCLITests
     {
         /// <summary>
         /// Samples whose declarations are already malformed in the repository
-        /// (comment text hanging off a broken VAR line). Comments attached to
-        /// those unreachable tokens are lost by this formatter and were lost by
-        /// every previous version too, so they are excluded from the guard.
+        /// (comment text hanging off a broken VAR line). Formatting them would
+        /// lose those comments, so since 1.8.8 the equivalence validator refuses
+        /// them outright — refusal is the correct outcome for these samples, and
+        /// any OTHER sample being refused is a regression. Before the validator
+        /// existed these files were silently written back with comments missing.
         /// </summary>
-        private static readonly HashSet<string> KnownLossySamples = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        private static readonly HashSet<string> KnownCorruptSamples = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         {
             "_Auto.TcPOU",
             "_Safety.TcPOU"
@@ -99,6 +101,7 @@ namespace STFormatterCLITests
             var lostComments = new List<string>();
             var notFixedPoint = new List<string>();
             var errors = new List<string>();
+            var refusedCorrupt = new List<string>();
             int oldFormat = 0;
 
             foreach (var src in files)
@@ -141,6 +144,17 @@ namespace STFormatterCLITests
                     if (!firstBytes.SequenceEqual(File.ReadAllBytes(tmp)))
                         notFixedPoint.Add(name);
                 }
+                catch (InvalidOperationException ex) when (ex.Message.Contains("等价性校验未通过"))
+                {
+                    // The equivalence validator refused the file. That is the
+                    // correct outcome for the known-corrupt samples (writing them
+                    // back used to silently drop comments); for anything else it
+                    // is a regression.
+                    if (KnownCorruptSamples.Contains(Path.GetFileName(name)))
+                        refusedCorrupt.Add(name);
+                    else
+                        errors.Add($"{name}: {ex.GetType().Name} {ex.Message}");
+                }
                 catch (Exception ex)
                 {
                     errors.Add($"{name}: {ex.GetType().Name} {ex.Message}");
@@ -157,6 +171,8 @@ namespace STFormatterCLITests
             foreach (var c in lostComments) _out.WriteLine("  LOST " + c);
             _out.WriteLine($"NOT_IDEMPOTENT {notFixedPoint.Count}");
             foreach (var c in notFixedPoint) _out.WriteLine("  NOTFIXEDPOINT " + c);
+            _out.WriteLine($"REFUSED_CORRUPT {refusedCorrupt.Count}");
+            foreach (var c in refusedCorrupt) _out.WriteLine("  REFUSED " + c);
             _out.WriteLine($"ERRORS {errors.Count}");
             foreach (var c in errors) _out.WriteLine("  ERROR " + c);
 
@@ -167,7 +183,7 @@ namespace STFormatterCLITests
                 "formatting is not a fixed point on:\n" + string.Join("\n", notFixedPoint));
 
             var unexpectedLoss = lostComments
-                .Where(entry => !KnownLossySamples.Contains(Path.GetFileName(entry.Split(' ')[0])))
+                .Where(entry => !KnownCorruptSamples.Contains(Path.GetFileName(entry.Split(' ')[0])))
                 .ToList();
             Assert.True(unexpectedLoss.Count == 0,
                 "comments were dropped from samples that are not already corrupt:\n" +

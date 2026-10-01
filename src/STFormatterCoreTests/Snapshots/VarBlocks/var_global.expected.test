@@ -1,0 +1,4 @@
+VAR_GLOBAL
+    nGlobalCounter : DINT;
+    sMessage       : STRING(100);
+END_VAR

@@ -1,0 +1,3 @@
+xInput := %IX0.0;
+nVal := %IW4;
+%QW0:=nOutput;

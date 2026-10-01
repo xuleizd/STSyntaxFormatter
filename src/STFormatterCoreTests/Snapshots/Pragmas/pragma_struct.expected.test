@@ -1,0 +1,7 @@
+{attribute 'pack_mode' := '1'}
+TYPE ST_Packed :
+STRUCT
+    byA : BYTE;
+    byB : BYTE;
+END_STRUCT
+END_TYPE

@@ -98,7 +98,7 @@ namespace STFormatterCLI
                     if (opts.Verbose) Console.WriteLine($"Formatting: {file}");
                     
                     var pouFile = new TcPouFile(file);
-                    pouFile.Format(formatterOptions);
+                    pouFile.Format(formatterOptions, validate: !opts.SkipValidation);
                     pouFile.Save();
                     
                     successCount++;

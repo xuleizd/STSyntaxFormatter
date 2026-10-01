@@ -1,0 +1,8 @@
+PROPERTY PUBLIC Value : INT
+GET
+    Value := nInternal;
+END_GET
+SET
+    nInternal := Value;
+END_SET
+END_PROPERTY

@@ -1,0 +1,6 @@
+nGlobal := 0;
+FB_Init();
+
+IF nGlobal < 0 THEN
+    nGlobal := 0;
+END_IF

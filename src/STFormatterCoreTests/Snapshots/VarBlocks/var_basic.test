@@ -1,0 +1,3 @@
+program Main
+var x:int; name:string(20); end_var
+end_program

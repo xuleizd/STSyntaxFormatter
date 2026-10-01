@@ -1,0 +1,4 @@
+VAR_GLOBAL CONSTANT
+    cMaxItems : INT := 100;
+    cVersion  : STRING(10) := 'V1.2';
+END_VAR

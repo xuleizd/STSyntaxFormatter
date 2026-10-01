@@ -1,0 +1,4 @@
+stCfg.nValue := 1;
+stCfg.stSub.rVal := 2.5;
+pPtr^.nField := 3;
+fbInst.stData.nItem := 4;

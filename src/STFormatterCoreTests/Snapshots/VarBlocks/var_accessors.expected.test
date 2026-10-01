@@ -1,0 +1,6 @@
+FUNCTION_BLOCK FB_Demo
+VAR
+    PUBLIC nPublic   : INT;
+    PRIVATE nPrivate : INT;
+END_VAR
+END_FUNCTION_BLOCK

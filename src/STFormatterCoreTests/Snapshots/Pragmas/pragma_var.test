@@ -1,0 +1,6 @@
+PROGRAM Main
+VAR
+{attribute 'init_on_onlchange'} nCfg:INT;
+nOther:INT;
+END_VAR
+END_PROGRAM

@@ -1,0 +1,26 @@
+{attribute 'reflection'}
+FUNCTION_BLOCK FB_Mixed EXTENDS FB_Base IMPLEMENTS I_X
+VAR_INPUT
+    // execute flag
+    bExecute : BOOL;
+    nMode    : INT := 0;
+END_VAR
+VAR RETAIN
+    nCounter : DINT;
+END_VAR
+VAR
+    stBuffer : ARRAY[0..9] OF ST_Item;
+    tLast    : T#0s;
+END_VAR
+
+    IF bExecute THEN
+        CASE nMode OF
+            0:
+                nCounter := nCounter + 1;
+            1 .. 5:
+                nCounter := nCounter * 2;
+            ELSE
+                nCounter := 0;
+        END_CASE
+    END_IF
+END_FUNCTION_BLOCK

@@ -1,0 +1,6 @@
+FB_Drive(
+// axis index
+nAxis:=1,
+rVelocity:=100.0,
+(* optional *) bRelative:=FALSE
+);

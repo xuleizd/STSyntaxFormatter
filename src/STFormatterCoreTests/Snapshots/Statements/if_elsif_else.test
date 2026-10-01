@@ -1,0 +1,5 @@
+if nState=1 then x:=1;
+elsif nState=2 then x:=2;
+elsif nState=3 then x:=3;
+else x:=0;
+end_if

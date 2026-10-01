@@ -1,0 +1,9 @@
+PROGRAM Main
+VAR RETAIN
+    nCounter : DINT;
+    stRecipe : ST_Recipe;
+END_VAR
+VAR_RETAIN
+    nAlsoRetained : INT;
+END_VAR
+END_PROGRAM

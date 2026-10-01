@@ -287,12 +287,13 @@ namespace STFormatterCore.Formatter
 
             if (hasEndKeyword)
             {
-                // Write tokens between keyword and END_*
+                // Write tokens between keyword and END_*. A comma (IMPLEMENTS
+                // I_A, I_B) attaches to the name in front of it — no gap.
                 for (int i = 1; i < endIndex; i++)
                 {
                     var tok = headerTokens[i];
                     WriteLeadingTrivia(tok);
-                    _output.Write(" ");
+                    if (tok.Kind != TokenKind.Comma) _output.Write(" ");
                     WriteTokenFormatted(tok);
                 }
             }
@@ -303,7 +304,7 @@ namespace STFormatterCore.Formatter
                 {
                     var tok = headerTokens[i];
                     WriteLeadingTrivia(tok);
-                    _output.Write(" ");
+                    if (tok.Kind != TokenKind.Comma) _output.Write(" ");
                     WriteTokenFormatted(tok);
                 }
             }
@@ -367,7 +368,7 @@ namespace STFormatterCore.Formatter
                 foreach (var child in node.Children)
                 {
                     if (child is VarDeclaration vd)
-                        maxNameLen = Math.Max(maxNameLen, (vd.Name ?? "").Length);
+                        maxNameLen = Math.Max(maxNameLen, VarHeaderWidth(vd));
                 }
             }
 
@@ -432,6 +433,7 @@ namespace STFormatterCore.Formatter
             Token endVarToken = null;
             var typeTokens = new List<Token>();
             var initTokens = new List<Token>();
+            var modifierTokens = new List<Token>(); // PUBLIC/PRIVATE/PROTECTED/INTERNAL prefix
             var extraNameTokens = new List<Token>(); // comma + extra identifiers (a, b, c : TYPE)
             Token atToken = null;
             Token addressToken = null;
@@ -500,7 +502,11 @@ namespace STFormatterCore.Formatter
 
                 if (!pastColon)
                 {
-                    if (tok.Kind == TokenKind.Identifier)
+                    if (IsVarAccessModifierKind(tok.Kind))
+                    {
+                        modifierTokens.Add(tok);
+                    }
+                    else if (tok.Kind == TokenKind.Identifier)
                     {
                         if (nameToken == null)
                             nameToken = tok;
@@ -541,10 +547,20 @@ namespace STFormatterCore.Formatter
                 }
             }
 
+            // Write access modifiers in front of the name (PUBLIC nCount : INT;)
+            for (int m = 0; m < modifierTokens.Count; m++)
+            {
+                var modifier = modifierTokens[m];
+                WriteLeadingTrivia(modifier);
+                if (m > 0) _output.Write(" ");
+                _output.WriteKeyword(modifier.Text);
+            }
+
             // Write name
             if (nameToken != null)
             {
                 WriteLeadingTrivia(nameToken);
+                if (modifierTokens.Count > 0) _output.Write(" ");
                 _output.Write(nameToken.Text);
             }
 
@@ -581,7 +597,7 @@ namespace STFormatterCore.Formatter
             {
                 if (alignWidth > 0 && nameToken != null)
                 {
-                    int padding = alignWidth - (nameToken.Text ?? "").Length + 1;
+                    int padding = alignWidth - VarHeaderWidth(node) + 1;
                     if (padding < 1) padding = 1;
                     _output.Write(new string(' ', padding));
                 }
@@ -658,6 +674,33 @@ namespace STFormatterCore.Formatter
         /// DirectAddress that is not the AT address, more than one colon, etc.) means
         /// we cannot safely reconstruct the line and must fall back to verbatim output.
         /// </summary>
+        /// <summary>
+        /// TwinCAT 3 member access modifiers that may prefix a VAR declaration
+        /// name (the formatter twin of STParser.IsVarAccessModifier).
+        /// </summary>
+        private static bool IsVarAccessModifierKind(TokenKind kind) =>
+            kind == TokenKind.Keyword_Public ||
+            kind == TokenKind.Keyword_Private ||
+            kind == TokenKind.Keyword_Protected ||
+            kind == TokenKind.Keyword_Internal;
+
+        /// <summary>
+        /// Width the declaration header occupies once written: access modifiers,
+        /// their separating spaces and the name. Colon alignment must use this
+        /// width, not the bare name length, or PUBLIC members align past the
+        /// column everyone else aligns to.
+        /// </summary>
+        private static int VarHeaderWidth(VarDeclaration node)
+        {
+            int width = (node.Name ?? "").Length;
+            foreach (var tok in node.Tokens)
+            {
+                if (!IsVarAccessModifierKind(tok.Kind)) break;
+                width += tok.Text.Length + 1; // token + separating space
+            }
+            return width;
+        }
+
         private static bool IsVarDeclarationShapeWellFormed(VarDeclaration node)
         {
             int colonCount = 0;
@@ -1967,7 +2010,7 @@ namespace STFormatterCore.Formatter
                 foreach (var child in node.Children)
                 {
                     if (child is VarDeclaration vd)
-                        maxNameLen = Math.Max(maxNameLen, (vd.Name ?? "").Length);
+                        maxNameLen = Math.Max(maxNameLen, VarHeaderWidth(vd));
                 }
             }
 
@@ -2149,7 +2192,7 @@ namespace STFormatterCore.Formatter
                 foreach (var child in node.Children)
                 {
                     if (child is VarDeclaration vd)
-                        maxNameLen = Math.Max(maxNameLen, (vd.Name ?? "").Length);
+                        maxNameLen = Math.Max(maxNameLen, VarHeaderWidth(vd));
                 }
             }
 
