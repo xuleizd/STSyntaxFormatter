@@ -86,6 +86,8 @@ namespace STFormatterCore.Lexer
         Assign,             // :=
         OutputAssign,       // =>
         RefAssign,          // REF=
+        SetAssign,          // S= (ExST set assignment, manual 16.1.3.4.3)
+        ResetAssign,        // R= (ExST reset assignment, manual 16.1.3.4.4)
         Equal,              // =
         NotEqual,           // <>
         LessThan,           // <

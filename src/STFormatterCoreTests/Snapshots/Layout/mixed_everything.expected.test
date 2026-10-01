@@ -17,7 +17,7 @@ END_VAR
         CASE nMode OF
             0:
                 nCounter := nCounter + 1;
-            1 .. 5:
+            1..5:
                 nCounter := nCounter * 2;
             ELSE
                 nCounter := 0;

@@ -24,7 +24,7 @@ namespace STFormatterVSIX
     /// two paths racing on the same document is a correctness hazard for no gain.
     /// </summary>
     [PackageRegistration(UseManagedResourcesOnly = true, AllowsBackgroundLoading = true)]
-    [InstalledProductRegistration("ST 格式化器", "TwinCAT3 ST 代码格式化工具", "1.8.9")]
+    [InstalledProductRegistration("ST 格式化器", "TwinCAT3 ST 代码格式化工具", "1.9.0")]
     [ProvideOptionPage(typeof(OptionsPage), "ST 格式化", "常规", 0, 0, true)]
     [ProvideMenuResource("Menus.ctmenu", 1)]
     [Guid(STFormatterPackage.PackageGuidString)]
@@ -81,62 +81,28 @@ namespace STFormatterVSIX
 
         /// <summary>
         /// Creates the format function that runs the Lexer → Parser → Formatter
-        /// pipeline behind three guards (1.8.9, the CSharpier "never corrupt the
-        /// buffer" policy):
-        ///   1. engine exceptions → keep the original text, show an InfoBar;
-        ///   2. empty or unchanged output → keep the original text;
-        ///   3. equivalence validation (token/tree/comment comparison) fails →
-        ///      keep the original text, show an InfoBar. A refused file always
-        ///      beats a corrupted one.
+        /// pipeline behind the shared Core guards (see GuardedFormatter):
+        /// engine exception / empty or unchanged output / failed equivalence
+        /// validation all keep the original text and surface an InfoBar. A refused
+        /// file always beats a corrupted one.
         /// </summary>
         internal static Func<string, string> CreateFormatFunc(OptionsPage options)
         {
             var formatterOptions = options.ToFormatterOptions();
-            bool validate = options.ValidateOutput;
-            return (string source) =>
-            {
-                if (string.IsNullOrWhiteSpace(source))
-                    return source;
-
-                // TwinCAT hands us fragments in several shapes: a full POU header,
-                // a method/property header with VAR blocks, a bare
-                // "VAR_INPUT ... END_VAR" variable block, or a bare statement list
-                // (ImplementationText without any header). The parser handles all of
-                // these at the top level (IsVarKeyword routes every VAR variant to
-                // ParseVarBlock, IsBareStatementStart routes statement lists to
-                // ParseStatement), so no wrapper is needed.
-                string formatted;
-                try
+            // TwinCAT hands us fragments in several shapes: a full POU header, a
+            // method/property header with VAR blocks, a bare "VAR_INPUT ... END_VAR"
+            // block, or a bare statement list (ImplementationText without any
+            // header). The parser handles all of these at the top level.
+            var guarded = new STFormatterCore.Formatter.GuardedFormatter(
+                source =>
                 {
-                    var lexer = new STFormatterCore.Lexer.STLexer(source);
-                    var tokens = lexer.Tokenize();
-                    var parser = new STFormatterCore.Parser.STParser(tokens);
-                    var cst = parser.Parse();
-                    var formatter = new STFormatterCore.Formatter.STFormatter(formatterOptions);
-                    formatted = formatter.Format(cst, source);
-                }
-                catch (Exception ex)
-                {
-                    ReportFormatFailure($"格式化引擎异常，已保留原文（{ex.Message}）");
-                    return source;
-                }
-
-                if (string.IsNullOrEmpty(formatted) || formatted == source)
-                    return source;
-
-                if (validate)
-                {
-                    var validation = STFormatterCore.Validation.FormattingValidator.Validate(
-                        source, formatted, formatterOptions);
-                    if (!validation.IsValid)
-                    {
-                        ReportFormatFailure($"等价性校验未通过，已保留原文（{validation.FailureMessage}）");
-                        return source;
-                    }
-                }
-
-                return formatted;
-            };
+                    var tokens = new STFormatterCore.Lexer.STLexer(source).Tokenize();
+                    var cst = new STFormatterCore.Parser.STParser(tokens).Parse();
+                    return new STFormatterCore.Formatter.STFormatter(formatterOptions).Format(cst, source);
+                },
+                validate: options.ValidateOutput,
+                onFailure: ReportFormatFailure);
+            return guarded.Format;
         }
 
         /// <summary>

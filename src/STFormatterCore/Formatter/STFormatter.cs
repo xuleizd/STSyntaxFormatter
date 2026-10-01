@@ -620,11 +620,16 @@ namespace STFormatterCore.Formatter
                     // No space before/after ( [ ) ] for string length specs like WSTRING(255)
                     // No space around . for dotted type names like Tc3_EventLogger.I_TcResultEvent
                     // No space around .. for subranges like ARRAY[1..10] OF INT
+                    // No space before , between array dimensions: ARRAY[1..2, 3..4]
+                    // No space before the operand of a unary minus: INT(-4095..4095)
                     if (tok.Kind == TokenKind.LeftParen || tok.Kind == TokenKind.LeftBracket ||
                         prevTypeTok.Kind == TokenKind.LeftParen || prevTypeTok.Kind == TokenKind.LeftBracket ||
                         tok.Kind == TokenKind.RightParen || tok.Kind == TokenKind.RightBracket ||
                         tok.Kind == TokenKind.Dot || prevTypeTok.Kind == TokenKind.Dot ||
-                        tok.Kind == TokenKind.DotDot || prevTypeTok.Kind == TokenKind.DotDot)
+                        tok.Kind == TokenKind.DotDot || prevTypeTok.Kind == TokenKind.DotDot ||
+                        tok.Kind == TokenKind.Comma ||
+                        (prevTypeTok.Kind == TokenKind.Minus && j >= 2 &&
+                         typeTokens[j - 2].Kind == TokenKind.LeftParen))
                     {
                         // No space
                     }
@@ -1408,10 +1413,11 @@ namespace STFormatterCore.Formatter
                         // Skip NewLine/Whitespace trivia
                     }
                 }
-                // No space before comma or colon
+                // No space before comma or colon, none around '..' (range labels)
                 if (prevTok != null &&
                     prevTok.Kind != TokenKind.Comma &&
                     tok.Kind != TokenKind.Comma &&
+                    tok.Kind != TokenKind.DotDot && prevTok.Kind != TokenKind.DotDot &&
                     !(tok.Kind == TokenKind.BadToken && tok.Text == ":"))
                     _output.Write(" ");
                 WriteTokenFormatted(tok);
@@ -1751,6 +1757,7 @@ namespace STFormatterCore.Formatter
             {
                 var tok = tokens[i];
                 var prev = i > 0 ? tokens[i - 1] : null;
+                var prevPrev = i > 1 ? tokens[i - 2] : null;
 
                 if (tok.LeadingTrivia != null)
                     WriteExpressionLeadingTrivia(tok.LeadingTrivia, preserveMultiLine);
@@ -1773,7 +1780,7 @@ namespace STFormatterCore.Formatter
                 // previous token, so on a continuation line it would put the comma's
                 // space in front of the first argument — one column further right on
                 // every formatting run.
-                if (_output.HasContentOnLine && NeedsSpaceBefore(tok, prev, _options))
+                if (_output.HasContentOnLine && NeedsSpaceBefore(tok, prev, _options, prevPrev))
                     _output.Write(" ");
 
                 WriteTokenFormatted(tok);
@@ -1865,10 +1872,11 @@ namespace STFormatterCore.Formatter
             {
                 var tok = tokens[i];
                 var prev = i > 0 ? tokens[i - 1] : null;
+                var prevPrev = i > 1 ? tokens[i - 2] : null;
 
                 WriteLeadingTrivia(tok);
 
-                if (NeedsSpaceBefore(tok, prev, _options))
+                if (NeedsSpaceBefore(tok, prev, _options, prevPrev))
                     _output.Write(" ");
 
                 // Special handling for TO and BY keywords in FOR
@@ -2630,8 +2638,12 @@ namespace STFormatterCore.Formatter
 
         /// <summary>
         /// Determines if a space is needed before the current token.
+        /// <paramref name="previousPrevious"/> (when the caller tracks it) enables
+        /// the unary-minus rule: a minus that opens an expression binds straight to
+        /// its operand ("ABS(-2)", "BY -1" → "BY -1" without an inner gap).
         /// </summary>
-        private static bool NeedsSpaceBefore(Token current, Token previous, FormatterOptions opts)
+        private static bool NeedsSpaceBefore(Token current, Token previous, FormatterOptions opts,
+                                            Token previousPrevious = null)
         {
             if (previous == null) return false;
 
@@ -2675,6 +2687,39 @@ namespace STFormatterCore.Formatter
             if (current.Kind == TokenKind.LeftParen && previous.Kind == TokenKind.Identifier)
                 return false;
 
+            // No space before ( when preceded by ) or ] (chained calls / FB array
+            // element calls): F(x)(y), aObjects[2]() — manual 16.1.3.5.10, 16.5.16
+            if (current.Kind == TokenKind.LeftParen &&
+                (previous.Kind == TokenKind.RightParen || previous.Kind == TokenKind.RightBracket))
+                return false;
+
+            // No space before ( when preceded by the function-style word operators
+            // EXPT/MOD: EXPT(7, 2) not EXPT (7, 2) — manual 16.3.8.7
+            if (current.Kind == TokenKind.LeftParen &&
+                (previous.Kind == TokenKind.Keyword_Expt || previous.Kind == TokenKind.Keyword_Mod))
+                return false;
+
+            // Unary minus directly after an opening bracket or comma is a sign,
+            // not a subtraction: ABS(-2), INT(-4095..4095), F(x, -1) — 16.4.3/16.5.3.
+            // (After BY the space stays — "BY -1" — only the sign-to-operand gap
+            // below is closed.)
+            if (current.Kind == TokenKind.Minus &&
+                (previous.Kind == TokenKind.LeftParen || previous.Kind == TokenKind.LeftBracket ||
+                 previous.Kind == TokenKind.Comma))
+                return false;
+
+            // The operand of a unary minus binds straight to the sign: "(-2)" and
+            // "BY -1", not "(- 2)" / "BY - 1". The minus is unary when the token in
+            // front of it cannot end an operand.
+            if (previous.Kind == TokenKind.Minus && IsUnaryMinusContext(previousPrevious))
+                return false;
+
+            // No space before ( after an integer literal (repeat-factor array
+            // initializers): [2(10), 2(20)] — manual 16.5.16
+            if (current.Kind == TokenKind.LeftParen &&
+                (previous.Kind == TokenKind.IntegerLiteral || previous.Kind == TokenKind.RealLiteral))
+                return false;
+
             // No space before [ when preceded by Identifier (array access): arr[0] not arr [0]
             // or by ARRAY (array type spec): ARRAY[1..10] not ARRAY [1..10]
             if (current.Kind == TokenKind.LeftBracket &&
@@ -2685,8 +2730,11 @@ namespace STFormatterCore.Formatter
             if (current.Kind == TokenKind.LeftBracket && previous.Kind == TokenKind.RightBracket)
                 return false;
 
-            // OutputAssign (=>) gets operator spacing
-            if (current.Kind == TokenKind.OutputAssign || previous.Kind == TokenKind.OutputAssign)
+            // OutputAssign (=>) and the ExST set/reset assignments (S=/R=) get
+            // operator spacing: "bSet S= bOperand"
+            if (current.Kind == TokenKind.OutputAssign || previous.Kind == TokenKind.OutputAssign ||
+                current.Kind == TokenKind.SetAssign || previous.Kind == TokenKind.SetAssign ||
+                current.Kind == TokenKind.ResetAssign || previous.Kind == TokenKind.ResetAssign)
                 return opts.OperatorSpacing;
 
             // Operator spacing: with the option on, always separate operators;
@@ -2698,6 +2746,22 @@ namespace STFormatterCore.Formatter
 
             // Default: space between most tokens
             return true;
+        }
+
+        /// <summary>
+        /// True when a minus following <paramref name="token"/> must be a sign
+        /// rather than a subtraction: at an expression start, after an opening
+        /// bracket, a comma, ':=' or the FOR step keyword BY.
+        /// </summary>
+        private static bool IsUnaryMinusContext(Token token)
+        {
+            if (token == null) return true;
+            return token.Kind == TokenKind.LeftParen ||
+                   token.Kind == TokenKind.LeftBracket ||
+                   token.Kind == TokenKind.Comma ||
+                   token.Kind == TokenKind.Semicolon ||
+                   token.Kind == TokenKind.Assign ||
+                   token.Kind == TokenKind.Keyword_By;
         }
 
         private static bool IsOperator(TokenKind kind)
@@ -2712,6 +2776,8 @@ namespace STFormatterCore.Formatter
                 case TokenKind.Assign:
                 case TokenKind.OutputAssign:
                 case TokenKind.RefAssign:
+                case TokenKind.SetAssign:
+                case TokenKind.ResetAssign:
                 case TokenKind.Equal:
                 case TokenKind.NotEqual:
                 case TokenKind.LessThan:

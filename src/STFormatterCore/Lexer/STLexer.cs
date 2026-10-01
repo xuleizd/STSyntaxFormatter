@@ -573,6 +573,23 @@ namespace STFormatterCore.Lexer
                 return TokenKind.RefAssign;
             }
 
+            // Check for the ExST set/reset assignments S= / R= (manual 16.1.3.4.3/4.4).
+            // Identifier greediness above guarantees the S/R is a standalone word,
+            // so a variable actually named "xS" can never be split here.
+            if (Peek() == '=')
+            {
+                if (text.Equals("S", StringComparison.OrdinalIgnoreCase))
+                {
+                    _pos++;
+                    return TokenKind.SetAssign;
+                }
+                if (text.Equals("R", StringComparison.OrdinalIgnoreCase))
+                {
+                    _pos++;
+                    return TokenKind.ResetAssign;
+                }
+            }
+
             // Check for typed literal prefix followed by #
             if (Peek() == '#' && TypedLiteralPrefixes.Contains(text))
             {
@@ -603,8 +620,9 @@ namespace STFormatterCore.Lexer
         {
             int start = _pos;
 
-            // Consume leading digits
-            while (!IsAtEnd && IsDigit(Peek()))
+            // Consume leading digits (underscores allowed as digit group
+            // separators: 1_000_000 — manual 16.4.2, same as based literals)
+            while (!IsAtEnd && (IsDigit(Peek()) || Peek() == '_'))
                 _pos++;
 
             // Check for based literal: digits followed by #
@@ -618,10 +636,10 @@ namespace STFormatterCore.Lexer
             }
 
             // Check for real literal: digits followed by . and another digit
-            if (Peek() == '.' && Peek(1) != '.' && IsDigit(Peek(1)))
+            if (Peek() == '.' && Peek(1) != '.' && (IsDigit(Peek(1)) || Peek(1) == '_'))
             {
                 _pos++; // consume '.'
-                while (!IsAtEnd && IsDigit(Peek()))
+                while (!IsAtEnd && (IsDigit(Peek()) || Peek() == '_'))
                     _pos++;
 
                 // Exponent part

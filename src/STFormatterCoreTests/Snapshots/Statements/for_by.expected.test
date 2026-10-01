@@ -2,6 +2,6 @@ FOR i := 1 TO 10 BY 2 DO
     nSum := nSum + i;
 END_FOR
 
-FOR j := 10 TO 1 BY - 1 DO
+FOR j := 10 TO 1 BY -1 DO
     nDown := nDown + j;
 END_FOR

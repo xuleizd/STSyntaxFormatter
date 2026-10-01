@@ -97,6 +97,7 @@ STFormatterCLI.exe -p <目录>            # 递归格式化目录下全部 *.TcP
 
 ## 版本历史（摘要）
 
+- **1.9.0** — 依据 Beckhoff《TwinCAT 3 PLC 编程》手册建立语法测试体系（xUnit + FluentAssertions + AutoFixture + Moq，246 个用例）；上线即抓出并修复 19 处排版/词法缺陷（`S=`/`R=` 被拆、下划线数字被拆、一元负号间距、`EXPT (`、`a[2] ()`、`1 .. 5` 标签等）
 - **1.8.9** — VSIX 保存路径收敛为单条（消除竞态）；等价性校验接入编辑器写回；失败 InfoBar 提示（带版本号）；CLI 删除无效占位选项、bool 选项可显式关闭；testdata 全样例输出基线
 - **1.8.8** — 等价性校验器 + 快照测试体系；修 `IMPLEMENTS` 列表丢逗号、VAR 成员访问修饰符（PUBLIC/PRIVATE）排版断裂
 - **1.8.7** — 修 `STRUCT RETAIN` 修饰符被删；STRUCT/UNION 头行行内注释不再丢失
